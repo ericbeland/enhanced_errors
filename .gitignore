@@ -1,0 +1,9 @@
+/.bundle
+/.env
+/log
+/tmp
+*.gem
+*.swp
+.DS_Store
+stackprof.dump
+
