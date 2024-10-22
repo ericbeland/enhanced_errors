@@ -33,10 +33,27 @@ foo
 
 <img src="./doc/images/enhanced-error.png" style="height: 171px; width: 440px;"></img>
 
+
+```ruby
+  describe 'attains enlightenment' do
+    let(:the_matrix) { 'code rains, dramatically' }
+
+    before(:each) do
+      @spoon = 'there is no spoon'
+    end
+
+    it 'in the matrix' do
+      #activate memoized item
+      the_matrix
+      stop = 'bullets'
+      raise 'No!'
+    end
+  end
+```
+
 #### Enhanced Exception In Specs:
 
 <img src="./doc/images/enhanced-spec.png" style="height: 426px; width: 712px;"></img>
-
 
 
 ## Features
