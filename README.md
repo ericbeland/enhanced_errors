@@ -121,9 +121,8 @@ $ gem install enhanced_errors
 To enable EnhancedErrors, call the `enhance!` method:
 
 ```ruby
-# For a rails app, in an initializer, or spec_helper.rb
-# 
-# config/initializers/enhanced_errors.rb
+# For a rails app, put this in an initializer, or spec_helper.rb
+# ex:  config/initializers/enhanced_errors.rb
 
 require 'awesome_print' # Optional, for better output
 EnhancedErrors.enhance!
@@ -134,7 +133,6 @@ EnhancedErrors.enhance!
 
 This activates the TracePoint to start capturing exceptions and their surrounding context.
 
-For a rails app, probably you'll want to add this
 
 ### Configuration Options
 
@@ -147,6 +145,7 @@ EnhancedErrors.enhance!(enabled: true, max_length: 2000) do
 end
 
 ```
+- `add_to_skip_list`: Variables to ignore, as symbols. ex:  :@instance_variable_to_skip, :local_to_skip`
 - `enabled`: Enables or disables the enhancement (default: `true`).
 - `max_length`: Sets the maximum length of the enhanced message (default: `2500`).
 
