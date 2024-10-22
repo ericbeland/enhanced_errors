@@ -117,10 +117,20 @@ $ gem install enhanced_errors
 To enable EnhancedErrors, call the `enhance!` method:
 
 ```ruby
+# For a rails app, in an initializer, or spec_helper.rb
+# 
+# config/initializers/enhanced_errors.rb
+
+require 'awesome_print' # Optional, for better output
 EnhancedErrors.enhance!
+
+# -> now your error messages will have variables and their values appended to them.
+
 ```
 
 This activates the TracePoint to start capturing exceptions and their surrounding context.
+
+For a rails app, probably you'll want to add this
 
 ### Configuration Options
 
@@ -319,7 +329,7 @@ encryptor = ENCRYPTOR
 EnhancedErrors.on_format = lambda do |formatted_string|
   encrypted_data = encryptor.encrypt_and_sign(formatted_string)
   encrypted_base64 = Base64.strict_encode64(encrypted_data)
-  "ENCRYPTED[#{encrypted_data}]"
+  "ENCRYPTED[#{encrypted_base64}]"
 end
 ```
 
