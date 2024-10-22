@@ -77,7 +77,7 @@ foo
 
 EnhancedErrors has a few big use-cases:
 
-* Data-driven bugs. For example, if, while processing a 10 gig file, you get an error, you can't just re-run the code with a debugger.
+* **Catch Data-driven bugs**. For example, if, while processing a 10 gig file, you get an error, you can't just re-run the code with a debugger.
 You also can't just print out all the data, because it's too big. You want to know what the data was the cause of the error.
 Ideally, without long instrument-re-run-fix loops. If your logging didn't capture the data, normally, you'd be stuck. 
 
