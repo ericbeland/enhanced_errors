@@ -6,6 +6,29 @@
 
 **EnhancedErrors** leverages Ruby's built-in [TracePoint](https://ruby-doc.org/core-3.1.0/TracePoint.html) feature to provide detailed context for exceptions, making debugging easier without significant performance overhead.
 
+When an exception is raised, EnhancedErrors captures the surrounding context, including:
+
+
+```ruby
+require 'enhanced_errors'
+require 'awesome_print' # Optional, for better output
+
+EnhancedErrors.enhance!
+
+begin
+  myvar = 0
+  @myinstance = 10
+  foo = @myinstance / myvar
+rescue => e
+  puts e.message
+end
+
+```
+
+
+
+
+
 ## Features
 
 - **Pure Ruby**: No external dependencies or C extensions.
@@ -41,7 +64,6 @@ If your logging didn't capture the data, normally, you'd be stuck.
 * "Unknown Unknowns" - you can't pre-emptively log variables from failure cases you never imagined.
 
 * Cron jobs and daemons - when it fails for unknown reasons at 4am, check the log and fix--it probably has what you need.
-
 
 ## Installation
 
@@ -142,22 +164,6 @@ it yields out a hash with the structure below. Modify it as needed and return th
 }
 ```
 
-#### Using `eligible_for_capture`
-
-The `eligible_for_capture` hook yields an Exception, and allows you to decide whether you want to capture it or not.
-By default, all exceptions are captured. When the block result is true, the error will be captured.
-Error capture is relatively cheap, but ignoring errors you don't care about makes it almost totally free.
-One use-case for eligible_for_capture is to run a string or regexp off a setting flag, which 
-lets you turn on and off what you capture without redeploying.
-
-```ruby 
-EnhancedErrors.eligible_for_capture do |exception|
-  exception.class.name == 'ExceptionIWantCatch'
-end
-
-
-```
-
 
 ```ruby
 EnhancedErrors.on_capture do |binding_info|
@@ -169,9 +175,26 @@ EnhancedErrors.on_capture do |binding_info|
 end
 ```
 
+
+#### Using `eligible_for_capture`
+
+The `eligible_for_capture` hook yields an Exception, and allows you to decide whether you want to capture it or not.
+By default, all exceptions are captured. When the block result is true, the error will be captured.
+Error capture is relatively cheap, but ignoring errors you don't care about makes it almost totally free.
+One use-case for eligible_for_capture is to run a string or regexp off a setting flag, which 
+lets you turn on and off what you capture without redeploying.
+
+```ruby 
+EnhancedErrors.eligible_for_capture do |exception|
+  exception.class.name == 'ExceptionIWantTOCatch'
+end
+
+
+```
+
 #### Using `on_format`
 
-`on_format` is the last stop for the message string that will be appended to the exception message.
+`on_format` is the last stop for the message string that will be appended to `exception.message`.
 
 Here it can be encrypted, rewritten, or otherwise modified.
 
@@ -199,9 +222,6 @@ end
 ```
 
 The skip list is pre-populated with common variables to exclude and can be extended based on your application's requirements. 
-
-
-# On Format
 
 
 
@@ -247,7 +267,7 @@ end
 ### Example: Encrypting Data in Custom Format
 
 
-```ruby```
+```ruby
 # config/initializers/encryption.rb
 
 require 'active_support'

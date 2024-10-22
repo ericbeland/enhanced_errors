@@ -334,6 +334,7 @@ class EnhancedErrors
 
       instance_vars_to_display = variables[:instances] || {}
 
+
       if instance_vars_to_display && !instance_vars_to_display.empty?
         result += "\n#{Colors.green('Instances:')}\n#{variable_description(instance_vars_to_display)}"
       end
@@ -452,16 +453,16 @@ class EnhancedErrors
           [var, binding_context.local_variable_get(var)]
         }.to_h
 
-        instance_vars = tp.self.instance_variables
+        instance_vars = binding_context.receiver.instance_variables
 
         instances = instance_vars.map { |var|
-          [var, (tp.self.instance_variable_get(var) rescue "#<Error getting instance variable: #{$!.message}>")]
+          [var, (binding_context.receiver.instance_variable_get(var) rescue "#<Error getting instance variable: #{$!.message}>")]
         }.to_h
 
         # Extract 'let' variables from :@__memoized (RSpec specific)
         lets = {}
-        if @capture_let_variables && tp.self.instance_variable_defined?(:@__memoized)
-          outer_memoized = tp.self&.instance_variable_get(:@__memoized)
+        if capture_let_variables && instance_vars.include?(:@__memoized)
+          outer_memoized = binding_context.receiver.instance_variable_get(:@__memoized)
           memoized = outer_memoized.instance_variable_get(:@memoized) if outer_memoized.respond_to?(:instance_variable_get)
           if memoized.is_a?(Hash)
             lets = memoized&.transform_keys(&:to_sym)
@@ -521,21 +522,27 @@ class EnhancedErrors
     # @param method_name [Symbol] The name of the method.
     # @return [String] A string representation of the method arguments.
     def extract_arguments(tp, method_name)
-      binding = tp.binding
-      method = method_name
-      return '' unless method
+      return '' unless method_name
+      begin
+        bind = tp.binding
+        unbound_method = tp.defined_class.instance_method(method_name)
+        method_obj = unbound_method.bind(tp.self)
+        parameters = method_obj.parameters
+        locals = bind.local_variables
 
-      locals = binding.local_variables
+        return parameters.map do |(type, name)|
+          value = locals.include?(name) ? bind.local_variable_get(name) : nil
+          "#{name}=#{value.inspect}"
+        rescue => e
+          "#{name}=#<Error getting argument: #{e.message}>"
+        end.join(", ")
+      end
 
-      return binding.receiver.method(method).parameters.map do |(type, name)|
-        value = locals.include?(name) ? binding.local_variable_get(name) : nil
-        "#{name}=#{value.inspect}"
       rescue => e
-        "#{name}=#<Error getting argument: #{e.message}>"
-      end.join(", ")
-    rescue => e
       "#<Error getting arguments: #{e.message}>"
     end
+
+
 
     # Determines the object name based on the TracePoint and method name.
     #
