@@ -5,23 +5,23 @@ require_relative '../lib/enhanced_errors'
 # gem install rspec
 # rspec examples/example_spec.rb
 
-RSpec.describe EnhancedErrors do
+RSpec.describe 'Neo' do
   before(:each) do
     EnhancedErrors.enhance!
   end
 
-  describe 'Exception enhancement' do
-    let(:my_let_variable) { 'sweet!' }
+  describe 'attains enlightenment' do
+    let(:the_matrix) { 'code rains, dramatically' }
 
     before(:each) do
-      @foo = 'bar'
+      @spoon = 'there is no spoon'
     end
 
-    it 'shows me some variables!' do
+    it 'in the matrix' do
       #activate memoized item
-      my_let_variable
-      my_local = 'value'
-      raise 'This is an error!'
+      the_matrix
+      stop = 'bullets'
+      raise 'No!'
     end
   end
 end

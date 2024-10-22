@@ -6,26 +6,36 @@
 
 **EnhancedErrors** leverages Ruby's built-in [TracePoint](https://ruby-doc.org/core-3.1.0/TracePoint.html) feature to provide detailed context for exceptions, making debugging easier without significant performance overhead.
 
-When an exception is raised, EnhancedErrors captures the surrounding context, including:
-
+When an exception is raised, EnhancedErrors captures the surrounding context.  It works like this:
 
 ```ruby
-require 'enhanced_errors'
+
+require './lib/enhanced_errors'
 require 'awesome_print' # Optional, for better output
 
 EnhancedErrors.enhance!
 
-begin
-  myvar = 0
-  @myinstance = 10
-  foo = @myinstance / myvar
-rescue => e
-  puts e.message
+def foo
+  begin
+    myvar = 0
+    @myinstance = 10
+    foo = @myinstance / myvar
+  rescue => e
+    puts e.message
+  end
 end
+
+foo
 
 ```
 
+#### Enhanced Exception In Code:
 
+<img src="./doc/images/enhanced-error.png" style="height: 171px; width: 440px;"></img>
+
+#### Enhanced Exception In Specs:
+
+<img src="./doc/images/enhanced-spec.png" style="height: 426px; width: 712px;"></img>
 
 
 

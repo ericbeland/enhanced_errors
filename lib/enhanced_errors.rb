@@ -59,7 +59,7 @@ class EnhancedErrors
                                 :@connection_subscriber,
                                 :@saved_pool_configs,
                                 :@loaded_fixtures,
-                                :@matcher_definitions
+                                :@matcher_definitions,
                               ])
 
     # @!constant RAILS_SKIP_LIST
@@ -299,7 +299,7 @@ class EnhancedErrors
     def apply_skip_list(binding_info)
       unless @debug
         variables = binding_info[:variables]
-        variables[:instances]&.reject! { |var, _| skip_list.include?(var) }
+        variables[:instances]&.reject! { |var, _| skip_list.include?(var) || var.to_s.start_with?('@__') }
         variables[:locals]&.reject! { |var, _| skip_list.include?(var) }
         variables[:globals]&.reject! { |var, _| skip_list.include?(var) }
       end
@@ -324,6 +324,7 @@ class EnhancedErrors
     # @return [String] The formatted string.
     def binding_info_string(binding_info)
       result = "\n#{Colors.green("#{binding_info[:capture_type].capitalize}: ")}#{Colors.blue(binding_info[:source])}"
+
       result += method_and_args_desc(binding_info[:method_and_args])
 
       variables = binding_info[:variables] || {}
@@ -351,68 +352,6 @@ class EnhancedErrors
         result = result[0...max_length] + "... (truncated)"
       end
       result + "\n\n"
-    end
-
-    # Generates a description string for method and its arguments.
-    #
-    # @param method_info [Hash] Information about the method and its arguments.
-    # @return [String] The method and arguments description.
-    def method_and_args_desc(method_info)
-      return '' unless method_info[:object_name] != '' || method_info[:args]&.length.to_i > 0
-      str = method_info[:object_name] + "(#{method_info[:args]})"
-
-      "\n#{Colors.green('Method: ')}#{Colors.blue(str)}\n"
-    end
-
-    # Generates a formatted description for a set of variables.
-    #
-    # @param vars_hash [Hash] A hash of variable names and their values.
-    # @return [String] The formatted variables description.
-    def variable_description(vars_hash)
-      vars_hash.map do |name, value|
-        "  #{Colors.purple(name)}: #{format_variable(value)}\n"
-      end.join
-    end
-
-    # Formats a variable for display, using `awesome_print` if available and enabled.
-    #
-    # @param variable [Object] The variable to format.
-    # @return [String] The formatted variable.
-    def format_variable(variable)
-      (awesome_print_available? && Colors.enabled?) ? variable.ai : variable.inspect
-    end
-
-    # Checks if the `AwesomePrint` gem is available.
-    #
-    # @return [Boolean] `true` if `AwesomePrint` is available, otherwise `false`.
-    def awesome_print_available?
-      return @awesome_print_available unless @awesome_print_available.nil?
-      @awesome_print_available = defined?(AwesomePrint)
-    end
-
-    # Default implementation for the on_format hook.
-    #
-    # @param string [String] The formatted exception message.
-    # @return [String] The unmodified exception message.
-    def default_on_format(string)
-      string
-    end
-
-    # Default implementation for the on_capture hook, applying the skip list.
-    #
-    # @param binding_info [Hash] The captured binding information.
-    # @return [Hash] The filtered binding information.
-    def default_on_capture(binding_info)
-      # Use this to clean up the captured bindings
-      EnhancedErrors.apply_skip_list(binding_info)
-    end
-
-    # Default eligibility check for capturing exceptions.
-    #
-    # @param exception [Exception] The exception to evaluate.
-    # @return [Boolean] `true` if the exception should be captured, otherwise `false`.
-    def default_eligible_for_capture(exception)
-      true
     end
 
     private
@@ -486,6 +425,7 @@ class EnhancedErrors
           object: tp.self,
           library: !!GEMS_REGEX.match?(location),
           method_and_args: method_and_args,
+          test_name: test_name,
           variables: {
             locals: locals,
             instances: instances,
@@ -516,6 +456,11 @@ class EnhancedErrors
       @trace.enable
     end
 
+    def test_name
+      return RSpec&.current_example&.full_description if defined?(RSpec)
+      nil
+    end
+
     # Extracts method arguments from the TracePoint binding.
     #
     # @param tp [TracePoint] The current TracePoint.
@@ -543,7 +488,6 @@ class EnhancedErrors
     end
 
 
-
     # Determines the object name based on the TracePoint and method name.
     #
     # @param tp [TracePoint] The current TracePoint.
@@ -553,7 +497,7 @@ class EnhancedErrors
       if tp.self.is_a?(Class) && tp.self.singleton_class == tp.defined_class
         "#{tp.self}.#{method_name}"
       else
-        "#{tp.defined_class}##{method_name}"
+        "#{tp.self.class.name}##{method_name}"
       end
     rescue => e
       "#<Error inspecting value: #{e.message}>"
@@ -577,8 +521,9 @@ class EnhancedErrors
     # @return [String] The formatted description.
     def method_and_args_desc(method_info)
       return '' unless method_info[:object_name] != '' || method_info[:args]&.length.to_i > 0
-      str = method_info[:object_name] + "(#{method_info[:args]})"
-
+      arg_str = method_info[:args]
+      arg_str = "(#{arg_str})" if arg_str != ""
+      str = method_info[:object_name] + arg_str
       "\n#{Colors.green('Method: ')}#{Colors.blue(str)}\n"
     end
 
