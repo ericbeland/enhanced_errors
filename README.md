@@ -355,10 +355,11 @@ The captured data is then appended to the exception's message, providing rich co
 
 ## Awesome Print
 
-EnhancedErrors uses the [awesome_print](https://github.com/awesome-print/awesome_print) 
-gem to format the captured data, if it is installed and available.
-If not, errors should still work, but the output may be less readable.  AwesomePrint is not
-required directly by EnhancedErrors, so you will need to add it to your Gemfile if you want to use it.
+EnhancedErrors automatically uses the [awesome_print](https://github.com/awesome-print/awesome_print) 
+gem to format the captured data, ___if___ it is installed and available.
+If not, error enhancement will work, but the output may be less pretty (er, awesome).
+AwesomePrint is not required directly by EnhancedErrors, so you will need to add it to your Gemfile 
+if you want to use it.
 
 ```ruby
 gem 'awesome_print'
