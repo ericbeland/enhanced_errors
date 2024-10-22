@@ -79,24 +79,22 @@ EnhancedErrors has a few big use-cases:
 
 * Data-driven bugs. For example, if, while processing a 10 gig file, you get an error, you can't just re-run the code with a debugger.
 You also can't just print out all the data, because it's too big. You want to know what the data was the cause of the error.
-Ideally, without long instrument-re-run-fix loops. 
+Ideally, without long instrument-re-run-fix loops. If your logging didn't capture the data, normally, you'd be stuck. 
 
-If your logging didn't capture the data, normally, you'd be stuck. 
+* **Debug** a complex application erroring deep in the stack when you can't tell where the error originates
 
-* Debug a complex application erroring deep in the stack when you can't tell where the error originates
+* **Faster TDD** - Often, you won't have to re-run to see an error--you can go straight to the fix.
 
-* Faster TDD - Often, you won't have to re-run to see an error--you can go straight to the fix.
-
-* Faster CI -> Dev fixes. When a bug happens in CI, usually there's a step where you first reproduce it locally.
+* **Faster CI -> Fix loop**. When a bug happens in CI, usually there's a step where you first reproduce it locally.
   EnhancedErrors can help you skip that step.
 
-* Faster debugging. In general, you can skip the add-instrumentation step and jump to the fix.
+* **Faster debugging**. In general, you can skip the add-instrumentation step and jump to the fix.
 
-* Heisenbugs - bugs that disappear when you try to debug them. EnhancedErrors can help you capture the data that causes the bug before it disappears.
+* **Heisenbugs** - bugs that disappear when you try to debug them. EnhancedErrors can help you capture the data that causes the bug before it disappears.
 
-* "Unknown Unknowns" - you can't pre-emptively log variables from failure cases you never imagined.
+* **Unknown Unknowns** - you can't pre-emptively log variables from failure cases you never imagined.
 
-* Cron jobs and daemons - when it fails for unknown reasons at 4am, check the log and fix--it probably has what you need.
+* **Cron jobs** and **daemons** - when it fails for unknown reasons at 4am, check the log and fix--it probably has what you need.
 
 ## Installation
 
