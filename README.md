@@ -12,25 +12,46 @@
 - **Standalone**: Does not rely on any external libraries.
 - **Lightweight**: Minimal performance impact, as tracing is only active during exception raising.
 - **Customizable Output**: Supports multiple output formats (`:json`, `:plaintext`, `:terminal`).
-- **Flexible Hooks**: Allows redacting or modifying captured data via the `on_capture` hook.
+- **Flexible Hooks**: Redact or modifying captured data via the `on_capture` hook.
 - **Environment-Based Defaults**: For Rails apps, automatically adjusts settings based on the environment (`development`, `test`, `production`, `ci`).
 - **Pre-Populated Skip List**: Comes with predefined skip lists to exclude irrelevant variables from being captured.
-- **Redaction Support**: Enables removal of Personally Identifiable Information (PII), healthcare data, and other sensitive information.
 - **Capture Levels**: Supports `info` and `debug` levels, where `debug` level ignores the skip lists for more comprehensive data capture.
-- **Capture Types**: Captures the first `raise` and the last `rescue` by default.
-- **Global Variable Capture**: Although global variable capture was previously supported, it is no longer functional. This is acknowledged in the documentation.
+- **Capture Types**: Captures variables from the first `raise` and the last `rescue` for an exception by default.
+- **No dependencies**:  EnhancedErrors does not ___require___ any dependencies--it uses [awesome_print](https://github.com/awesome-print/awesome_print) for nicer output if it is installed and available.
 
+EnhancedErrors has a few big use-cases:
+
+* Data-driven bugs. For example, if, while processing a 10 gig file, you get an error, you can't just re-run the code with a debugger.
+You also can't just print out all the data, because it's too big. You want to know what the data was the cause of the error.
+Ideally, without long instrument-re-run-fix loops. 
+
+If your logging didn't capture the data, normally, you'd be stuck. 
+
+* Debug a complex application erroring deep in the stack when you can't tell where the error originates
+
+* Faster TDD - Often, you won't have to re-run to see an error--you can go straight to the fix.
+
+* Faster CI -> Dev fixes. When a bug happens in CI, usually there's a step where you first reproduce it locally.
+  EnhancedErrors can help you skip that step.
+
+* Faster debugging. In general, you can skip the add-instrumentation step and jump to the fix.
+
+* Heisenbugs - bugs that disappear when you try to debug them. EnhancedErrors can help you capture the data that causes the bug before it disappears.
+
+* "Unknown Unknowns" - you can't pre-emptively log variables from failure cases you never imagined.
+
+* Cron jobs and daemons - when it fails for unknown reasons at 4am, check the log and fix--it probably has what you need.
 
 
 ## Installation
 
-Add this line to your application's `Gemfile`:
+Add this line to your `Gemfile`:
 
 ```ruby
 gem 'enhanced_errors'
 ```
 
-And then execute:
+Then execute:
 
 ```shell
 $ bundle install
@@ -42,9 +63,7 @@ Or install it yourself with:
 $ gem install enhanced_errors
 ```
 
-## Usage
-
-### Basic Setup
+## Basic Usage
 
 To enable EnhancedErrors, call the `enhance!` method:
 
@@ -61,9 +80,10 @@ You can pass configuration options to `enhance!`:
 ```ruby
 EnhancedErrors.enhance!(enabled: true, max_length: 2000) do
   # Additional configuration here
+  add_to_skip_list :@instance_variable_to_skip, :local_to_skip
 end
-```
 
+```
 - `enabled`: Enables or disables the enhancement (default: `true`).
 - `max_length`: Sets the maximum length of the enhanced message (default: `2500`).
 
@@ -102,7 +122,42 @@ EnhancedErrors.format(captured_bindings, :json)
 
 #### Using `on_capture`
 
-The `on_capture` hook allows you to modify or redact data as it's captured:
+The `on_capture` hook allows you to modify or redact data as it is captured. For each captured binding
+it yields out a hash with the structure below. Modify it as needed and return the modified hash.
+
+```ruby 
+{
+  source: source_location,
+  object: Object source of error,
+  library: true or false,
+  method_and_args: method_and_args,
+  variables: {
+    locals: locals,
+    instances: instances,
+    lets: lets,
+    globals: globals
+  },
+  exception: exception.class.name,
+  capture_type: capture_type # 'raise' or 'rescue'
+}
+```
+
+#### Using `eligible_for_capture`
+
+The `eligible_for_capture` hook yields an Exception, and allows you to decide whether you want to capture it or not.
+By default, all exceptions are captured. When the block result is true, the error will be captured.
+Error capture is relatively cheap, but ignoring errors you don't care about makes it almost totally free.
+One use-case for eligible_for_capture is to run a string or regexp off a setting flag, which 
+lets you turn on and off what you capture without redeploying.
+
+```ruby 
+EnhancedErrors.eligible_for_capture do |exception|
+  exception.class.name == 'ExceptionIWantCatch'
+end
+
+
+```
+
 
 ```ruby
 EnhancedErrors.on_capture do |binding_info|
@@ -114,51 +169,66 @@ EnhancedErrors.on_capture do |binding_info|
 end
 ```
 
-**Redaction Explanation**: Redacting is essential to remove Personally Identifiable Information (PII), healthcare data, or other sensitive information from exception messages. This ensures that sensitive data is not exposed in logs or error reports, maintaining compliance with data protection regulations.
+#### Using `on_format`
 
-#### Applying a Skip List
+`on_format` is the last stop for the message string that will be appended to the exception message.
 
-EnhancedErrors comes with predefined skip lists to exclude sensitive or irrelevant variables. You can add additional variables to the skip list as needed:
+Here it can be encrypted, rewritten, or otherwise modified.
+
 
 ```ruby
-EnhancedErrors.add_to_skip_list :@sensitive_variable, :$global_secret
+EnhancedErrors.on_format do |formatted_string|
+  "---whatever--- #{formatted_string} ---whatever---"
+end
+
 ```
 
-The skip list is pre-populated with common variables to exclude and can be extended based on your application's requirements. In `debug` mode, additional variables are included as per the skip list configurations.
+
+#### Applying a Variable Skip List
+
+EnhancedErrors comes with predefined skip lists to exclude sensitive or irrelevant variables. 
+By default, the skip list is used to remove a lot of framework noise from Rails and RSpec.
+You can add additional variables to the skip list as needed:
+
+```ruby
+ 
+EnhancedErrors.enhance! do
+  add_to_skip_list :@variable_to_skip
+end
+
+```
+
+The skip list is pre-populated with common variables to exclude and can be extended based on your application's requirements. 
+
+
+# On Format
+
+
+
 
 ### Capture Levels
 
 EnhancedErrors supports different capture levels to control the verbosity of the captured data:
 
-- **Info Level**: Respects the skip list, excluding predefined sensitive or irrelevant variables.
-- **Debug Level**: Ignores the skip lists, capturing all variables including those typically excluded.
+- **Info Level**: Respects the skip list, excluding predefined sensitive or irrelevant variables. Global variables are ignored.
+- **Debug Level**: Ignores the skip lists, capturing all variables including those typically excluded and global variables.
+  Global variables,
 
 **Default Behavior**: By default, `info` level is used, which excludes variables in the skip list to protect sensitive information. In `debug` mode, the skip lists are ignored to provide more comprehensive data, which is useful during development but should be used cautiously to avoid exposing sensitive data.
+The info mode is recommended.
+
+
 
 ### Capture Types
 
 EnhancedErrors differentiates between two types of capture events:
 
 - **`raise`**: Captures the context when an exception is initially raised.
-- **`rescue`**: Captures the context when an exception is rescued.
+- **`rescue`**: Captures the context when an exception is last rescued.
 
-**Default Behavior**: By default, EnhancedErrors returns the first `raise` and the last `rescue` event for each exception. This provides a clear picture of where and how the exception was handled.
+**Default Behavior**: By default, EnhancedErrors returns the first `raise` and the last `rescue` event for each exception. 
+This provides a clear picture of where and how the exception was handled.
 
-### Custom Formatting
-
-You can define a custom format for the captured data:
-
-```ruby
-def custom_format(captured_bindings)
-  captured_bindings.map do |binding_info|
-    # Encrypt the variables for security
-    binding_info[:variables] = encrypt_variables(binding_info[:variables])
-    binding_info.to_s
-  end.join("\n")
-end
-
-EnhancedErrors.format(captured_bindings, :custom_format)
-```
 
 ### Example: Redacting Sensitive Information
 
@@ -176,44 +246,41 @@ end
 
 ### Example: Encrypting Data in Custom Format
 
-```ruby
-require 'openssl'
 
-def encrypt_variables(variables)
-  cipher = OpenSSL::Cipher.new('AES-128-CBC').encrypt
-  cipher.key = 'a secret key'
-  variables.each do |type, vars|
-    vars.each do |key, value|
-      encrypted = cipher.update(value.to_s) + cipher.final
-      vars[key] = encrypted.unpack1('H*')  # Convert to hex string
-    end
-  end
-  variables
-end
+```ruby```
+# config/initializers/encryption.rb
 
-def encrypted_format(captured_bindings)
-  captured_bindings.map do |binding_info|
-    binding_info[:variables] = encrypt_variables(binding_info[:variables])
-    binding_info.to_s
-  end.join("\n")
-end
+require 'active_support'
 
-EnhancedErrors.on_capture do |binding_info|
-  binding_info
-end
+# Retrieve the encryption key from Rails credentials or environment variables
+ENCRYPTION_KEY = Rails.application.credentials.encryption_key || ENV['ENCRYPTION_KEY']
 
-# Set the custom format
-def custom_format_method(captured_bindings)
-  encrypted_format(captured_bindings)
-end
-
-# Use the custom format
-EnhancedErrors.format(captured_bindings, :custom_format)
+# It's recommended to use a 256-bit key (32 bytes)
+# If your key is in hex or another format, ensure it's properly decoded
+key = ActiveSupport::KeyGenerator.new(ENCRYPTION_KEY).generate_key('enhanced_errors', 32)
+ENCRYPTOR = ActiveSupport::MessageEncryptor.new(key)
 ```
+
+```ruby
+
+require_relative 'path_to/enhanced_errors' # Adjust the path accordingly
+require 'active_support/message_encryptor'
+
+# Ensure the encryptor is initialized
+encryptor = ENCRYPTOR
+
+EnhancedErrors.on_format = lambda do |formatted_string|
+  encrypted_data = encryptor.encrypt_and_sign(formatted_string)
+  encrypted_base64 = Base64.strict_encode64(encrypted_data)
+  "ENCRYPTED[#{encrypted_data}]"
+end
+```
+
 
 ## How It Works
 
-EnhancedErrors uses Ruby's `TracePoint` to listen for `:raise` and `:rescue` events. When an exception is raised or rescued, it captures:
+EnhancedErrors uses Ruby's `TracePoint` to listen for `:raise` and `:rescue` events. 
+When an exception is raised or rescued, it captures:
 
 - **Local Variables**: Variables local to the scope where the exception occurred.
 - **Instance Variables**: Instance variables of the object.
@@ -225,14 +292,23 @@ The captured data includes a `capture_type` field indicating whether the data wa
 
 The captured data is then appended to the exception's message, providing rich context for debugging.
 
+
+## Awesome Print
+
+EnhancedErrors uses the [awesome_print](https://github.com/awesome-print/awesome_print) 
+gem to format the captured data, if it is installed and available.
+If not, errors should still work, but the output may be less readable.  AwesomePrint is not
+required directly by EnhancedErrors, so you will need to add it to your Gemfile if you want to use it.
+
+```ruby
+gem 'awesome_print'
+```
+
+
 ## Performance Considerations
 
 - **Minimal Overhead**: Since TracePoint is only activated during exception raising and rescuing, the performance impact is negligible during normal operation.
 - **Production Safe**: The gem is designed to be safe for production use, giving you valuable insights without compromising performance.
-
-## Security Considerations
-
-- **Redacting Sensitive Data**: Use the `on_capture` hook to redact or remove Personally Identifiable Information (PII), healthcare data, or other sensitive information before it gets appended to exception messages. This is crucial for maintaining compliance with data protection regulations and ensuring that sensitive information is not exposed in logs or error reports.
 
 ## Contributing
 
