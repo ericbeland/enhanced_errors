@@ -13,7 +13,7 @@ When an exception is raised, EnhancedErrors captures the surrounding context.  I
 
 ```ruby
 
-require './lib/enhanced_errors'
+require 'enhanced_errors'
 require 'awesome_print' # Optional, for better output
 
 EnhancedErrors.enhance!
