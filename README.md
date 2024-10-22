@@ -7,6 +7,9 @@
 **EnhancedErrors** leverages Ruby's built-in [TracePoint](https://ruby-doc.org/core-3.1.0/TracePoint.html) feature to provide detailed context for exceptions, making debugging easier without significant performance overhead.
 
 When an exception is raised, EnhancedErrors captures the surrounding context.  It works like this:
+<br>
+
+#### Enhanced Exception In Code:
 
 ```ruby
 
@@ -29,10 +32,13 @@ foo
 
 ```
 
-#### Enhanced Exception In Code:
+##### Output:
 
 <img src="./doc/images/enhanced-error.png" style="height: 171px; width: 440px;"></img>
 
+<br>
+
+#### Enhanced Exception In Specs:
 
 ```ruby
   describe 'attains enlightenment' do
@@ -51,7 +57,7 @@ foo
   end
 ```
 
-#### Enhanced Exception In Specs:
+#### Output:
 
 <img src="./doc/images/enhanced-spec.png" style="height: 426px; width: 712px;"></img>
 

@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name = "enhanced_errors"
-  spec.version = "0.1.0"
+  spec.version = "0.1.1"
   spec.authors = ["Eric Beland"]
 
   spec.summary = "Automatically enhance your errors with messages containing variable values from the moment they were raised."
@@ -8,7 +8,7 @@ Gem::Specification.new do |spec|
   spec.homepage = "https://github.com/ericbeland/enhanced_errors."
   spec.required_ruby_version = ">= 3.0.0"
 
-  spec.metadata["homepage_uri"] = spec.homepage
+  spec.metadata["homepage_uri"] = "https://github.com/ericbeland/enhanced_errors"
   spec.metadata["source_code_uri"] = "https://github.com/ericbeland/enhanced_errors"
 
   # Specify which files should be added to the gem when it is released.
