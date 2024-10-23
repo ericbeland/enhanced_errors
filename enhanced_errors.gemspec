@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name = "enhanced_errors"
-  spec.version = "0.1.1"
+  spec.version = "0.1.2"
   spec.authors = ["Eric Beland"]
 
   spec.summary = "Automatically enhance your errors with messages containing variable values from the moment they were raised."
@@ -20,7 +20,8 @@ Gem::Specification.new do |spec|
     end
   end
   spec.require_paths = ["lib"]
-  spec.add_development_dependency "rspec", "> 3.4.0"
-  spec.add_development_dependency "awesome_print", "> 1.9.0"
-  spec.add_development_dependency "yard", "> 0.9.33"
+
+  spec.add_development_dependency "awesome_print", "~> 1.0"
+  spec.add_development_dependency "rspec", "~> 3.0"
+  spec.add_development_dependency "yard", "> 0.9"
 end

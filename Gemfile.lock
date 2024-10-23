@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    enhanced_errors (0.1.1)
+    enhanced_errors (0.1.2)
 
 GEM
   remote: https://rubygems.org/
@@ -27,10 +27,10 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  awesome_print (> 1.9.0)
+  awesome_print (~> 1.0)
   enhanced_errors!
-  rspec (> 3.4.0)
-  yard (> 0.9.33)
+  rspec (~> 3.0)
+  yard (> 0.9)
 
 BUNDLED WITH
    2.4.19
