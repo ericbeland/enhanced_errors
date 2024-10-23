@@ -39,20 +39,21 @@ foo
 #### Enhanced Exception In Specs:
 
 ```ruby
-  describe 'attains enlightenment' do
-    let(:the_matrix) { 'code rains, dramatically' }
+describe 'sees through' do
 
-    before(:each) do
-      @spoon = 'there is no spoon'
-    end
+  let(:the_matrix) { 'code rains, dramatically' }
 
-    it 'in the matrix' do
-      #activate memoized item
-      the_matrix
-      stop = 'bullets'
-      raise 'No!'
-    end
+  before(:each) do
+    @spoon = 'there is no spoon'
   end
+
+  it 'the matrix' do
+    #activate memoized item
+    the_matrix
+    stop = 'bullets'
+    raise 'No!'
+  end
+end
 ```
 
 #### Output:
@@ -63,7 +64,6 @@ foo
 ## Features
 
 - **Pure Ruby**: No external dependencies, C extensions, or C API calls.
-- **Standalone**: Does not rely on any external libraries.
 - **Lightweight**: Minimal performance impact, as tracing is only active during exception raising.
 - **Customizable Output**: Supports multiple output formats (`:json`, `:plaintext`, `:terminal`).
 - **Flexible Hooks**: Redact or modifying captured data via the `on_capture` hook.
@@ -146,6 +146,10 @@ end
 - `add_to_skip_list`: Variables to ignore, as symbols. ex:  :@instance_variable_to_skip, :local_to_skip`
 - `enabled`: Enables or disables the enhancement (default: `true`).
 - `max_length`: Sets the maximum length of the enhanced message (default: `2500`).
+
+Currently, the first `raise` exception binding is presented. 
+This may be changed in the future to allow more binding data to be presented.
+
 
 ### Environment-Based Defaults
 
@@ -263,14 +267,13 @@ The skip list is pre-populated with common variables to exclude and can be exten
 
 
 
-
 ### Capture Levels
 
 EnhancedErrors supports different capture levels to control the verbosity of the captured data:
 
 - **Info Level**: Respects the skip list, excluding predefined sensitive or irrelevant variables. Global variables are ignored.
 - **Debug Level**: Ignores the skip lists, capturing all variables including those typically excluded and global variables.
-  Global variables,
+  Global variables are only captured in debug mode, and they exclude the default Ruby global variables.
 
 **Default Behavior**: By default, `info` level is used, which excludes variables in the skip list to protect sensitive information. In `debug` mode, the skip lists are ignored to provide more comprehensive data, which is useful during development but should be used cautiously to avoid exposing sensitive data.
 The info mode is recommended.
