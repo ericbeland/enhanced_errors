@@ -10,48 +10,59 @@ require_relative 'binding'
 # It offers customization options for formatting and filtering captured data.
 class EnhancedErrors
   class << self
-    # @!attribute [rw] enabled
-    #   @return [Boolean] Indicates whether EnhancedErrors is enabled.
+    # Indicates whether EnhancedErrors is enabled.
+    #
+    # @return [Boolean]
     attr_accessor :enabled
 
-    # @!attribute [rw] trace
-    #   @return [TracePoint, nil] The TracePoint object used for tracing exceptions.
+    # The TracePoint object used for tracing exceptions.
+    #
+    # @return [TracePoint, nil]
     attr_accessor :trace
 
-    # @!attribute [rw] config_block
-    #   @return [Proc, nil] The configuration block provided during enhancement.
+    # The configuration block provided during enhancement.
+    #
+    # @return [Proc, nil]
     attr_accessor :config_block
 
-    # @!attribute [rw] max_length
-    #   @return [Integer] The maximum length of the formatted exception message.
+    # The maximum length of the formatted exception message.
+    #
+    # @return [Integer]
     attr_accessor :max_length
 
-    # @!attribute [rw] on_capture_hook
-    #   @return [Proc, nil] Hook to modify binding information upon capture.
+    # Hook to modify binding information upon capture.
+    #
+    # @return [Proc, nil]
     attr_accessor :on_capture_hook
 
-    # @!attribute [rw] capture_let_variables
-    #   @return [Boolean] Determines whether RSpec `let` variables are captured.
+    # Determines whether RSpec `let` variables are captured.
+    #
+    # @return [Boolean]
     attr_accessor :capture_let_variables
 
-    # @!attribute [rw] eligible_for_capture
-    #   @return [Proc, nil] A proc that determines if an exception is eligible for capture.
+    # A proc that determines if an exception is eligible for capture.
+    #
+    # @return [Proc, nil]
     attr_accessor :eligible_for_capture
 
-    # @!attribute [rw] skip_list
-    #   @return [Set<Symbol>] A set of variable names to exclude from binding information.
+    # A set of variable names to exclude from binding information.
+    #
+    # @return [Set<Symbol>]
     attr_accessor :skip_list
 
-    # @!constant GEMS_REGEX
-    #   @return [Regexp] Regular expression to identify gem paths.
+    # Regular expression to identify gem paths.
+    #
+    # @return [Regexp]
     GEMS_REGEX = %r{[\/\\]gems[\/\\]}
 
-    # @!constant DEFAULT_MAX_LENGTH
-    #   @return [Integer] The default maximum length for formatted exception messages.
+    # The default maximum length for formatted exception messages.
+    #
+    # @return [Integer]
     DEFAULT_MAX_LENGTH = 2500
 
-    # @!constant RSPEC_SKIP_LIST
-    #   @return [Set<Symbol>] A set of RSpec-specific instance variables to skip.
+    # A set of RSpec-specific instance variables to skip.
+    #
+    # @return [Set<Symbol>]
     RSPEC_SKIP_LIST = Set.new([
                                 :@fixture_cache,
                                 :@fixture_cache_key,
@@ -62,8 +73,9 @@ class EnhancedErrors
                                 :@matcher_definitions,
                               ])
 
-    # @!constant RAILS_SKIP_LIST
-    #   @return [Set<Symbol>] A set of Rails-specific instance variables to skip.
+    # A set of Rails-specific instance variables to skip.
+    #
+    # @return [Set<Symbol>]
     RAILS_SKIP_LIST = Set.new([
                                 :@new_record,
                                 :@attributes,
@@ -221,7 +233,7 @@ class EnhancedErrors
     # Formats the captured binding information into a string based on the specified format.
     #
     # @param captured_bindings [Array<Hash>] The array of captured binding information.
-    # @param output_format [Symbol] The format to use for output (:json, :plaintext, :terminal).
+    # @param output_format [Symbol] The format to use (:json, :plaintext, :terminal).
     # @return [String] The formatted exception message.
     def format(captured_bindings = [], output_format = get_default_format_for_environment)
       result = binding_infos_array_to_string(captured_bindings, output_format)
@@ -456,6 +468,9 @@ class EnhancedErrors
       @trace.enable
     end
 
+    # Retrieves the current test name from RSpec, if available.
+    #
+    # @return [String, nil] The current test name or `nil` if not in a test context.
     def test_name
       return RSpec&.current_example&.full_description if defined?(RSpec)
       nil
@@ -475,18 +490,16 @@ class EnhancedErrors
         parameters = method_obj.parameters
         locals = bind.local_variables
 
-        return parameters.map do |(type, name)|
+        parameters.map do |(type, name)|
           value = locals.include?(name) ? bind.local_variable_get(name) : nil
           "#{name}=#{value.inspect}"
         rescue => e
           "#{name}=#<Error getting argument: #{e.message}>"
         end.join(", ")
-      end
-
       rescue => e
-      "#<Error getting arguments: #{e.message}>"
+        "#<Error getting arguments: #{e.message}>"
+      end
     end
-
 
     # Determines the object name based on the TracePoint and method name.
     #

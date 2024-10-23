@@ -6,6 +6,7 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
+    awesome_print (1.9.2)
     diff-lcs (1.5.1)
     rspec (3.13.0)
       rspec-core (~> 3.13.0)
@@ -20,13 +21,16 @@ GEM
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.13.0)
     rspec-support (3.13.1)
+    yard (0.9.37)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
+  awesome_print (> 1.9.0)
   enhanced_errors!
   rspec (> 3.4.0)
+  yard (> 0.9.33)
 
 BUNDLED WITH
    2.4.19

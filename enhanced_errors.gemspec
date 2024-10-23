@@ -5,10 +5,10 @@ Gem::Specification.new do |spec|
 
   spec.summary = "Automatically enhance your errors with messages containing variable values from the moment they were raised."
   spec.description = "With no extra dependencies, and using only Ruby's built-in TracePoint, EnhancedErrors will automatically enhance your errors with messages containing variable values from the moment they were raised."
-  spec.homepage = "https://github.com/ericbeland/enhanced_errors."
+  spec.homepage = "https://github.com/ericbeland/enhanced_errors"
   spec.required_ruby_version = ">= 3.0.0"
 
-  spec.metadata["homepage_uri"] = "https://github.com/ericbeland/enhanced_errors"
+  spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/ericbeland/enhanced_errors"
 
   # Specify which files should be added to the gem when it is released.
@@ -21,4 +21,6 @@ Gem::Specification.new do |spec|
   end
   spec.require_paths = ["lib"]
   spec.add_development_dependency "rspec", "> 3.4.0"
+  spec.add_development_dependency "awesome_print", "> 1.9.0"
+  spec.add_development_dependency "yard", "> 0.9.33"
 end
