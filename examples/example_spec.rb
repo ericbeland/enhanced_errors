@@ -10,14 +10,14 @@ RSpec.describe 'Neo' do
     EnhancedErrors.enhance!
   end
 
-  describe 'attains enlightenment' do
+  describe 'sees through' do
     let(:the_matrix) { 'code rains, dramatically' }
 
     before(:each) do
       @spoon = 'there is no spoon'
     end
 
-    it 'in the matrix' do
+    it 'the matrix' do
       #activate memoized item
       the_matrix
       stop = 'bullets'
