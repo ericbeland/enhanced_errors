@@ -34,10 +34,8 @@ foo
 
 ##### Output:
 
-<img src="./doc/images/enhanced-error.png" style="height: 171px; width: 440px;"></img>
-
+<img src="./doc/images/enhanced-error.png" style="height: 215px; width: 429px;"></img>
 <br>
-
 #### Enhanced Exception In Specs:
 
 ```ruby
@@ -59,12 +57,12 @@ foo
 
 #### Output:
 
-<img src="./doc/images/enhanced-spec.png" style="height: 426px; width: 712px;"></img>
+<img src="./doc/images/enhanced-spec.png" style="height: 369px; width: 712px;"></img>
 
 
 ## Features
 
-- **Pure Ruby**: No external dependencies or C extensions.
+- **Pure Ruby**: No external dependencies, C extensions, or C API calls.
 - **Standalone**: Does not rely on any external libraries.
 - **Lightweight**: Minimal performance impact, as tracing is only active during exception raising.
 - **Customizable Output**: Supports multiple output formats (`:json`, `:plaintext`, `:terminal`).
@@ -287,7 +285,7 @@ EnhancedErrors differentiates between two types of capture events:
 - **`rescue`**: Captures the context when an exception is last rescued.
 
 **Default Behavior**: By default, EnhancedErrors returns the first `raise` and the last `rescue` event for each exception. 
-This provides a clear picture of where and how the exception was handled.
+The `rescue` exception is only available in Ruby 3.2+ as it was added to TracePoint events in Ruby 3.2.
 
 
 ### Example: Redacting Sensitive Information
@@ -303,39 +301,6 @@ EnhancedErrors.on_capture do |binding_info|
   binding_info
 end
 ```
-
-### Example: Encrypting Data in Custom Format
-
-
-```ruby
-# config/initializers/encryption.rb
-
-require 'active_support'
-
-# Retrieve the encryption key from Rails credentials or environment variables
-ENCRYPTION_KEY = Rails.application.credentials.encryption_key || ENV['ENCRYPTION_KEY']
-
-# It's recommended to use a 256-bit key (32 bytes)
-# If your key is in hex or another format, ensure it's properly decoded
-key = ActiveSupport::KeyGenerator.new(ENCRYPTION_KEY).generate_key('enhanced_errors', 32)
-ENCRYPTOR = ActiveSupport::MessageEncryptor.new(key)
-```
-
-```ruby
-
-require_relative 'path_to/enhanced_errors' # Adjust the path accordingly
-require 'active_support/message_encryptor'
-
-# Ensure the encryptor is initialized
-encryptor = ENCRYPTOR
-
-EnhancedErrors.on_format = lambda do |formatted_string|
-  encrypted_data = encryptor.encrypt_and_sign(formatted_string)
-  encrypted_base64 = Base64.strict_encode64(encrypted_data)
-  "ENCRYPTED[#{encrypted_base64}]"
-end
-```
-
 
 ## How It Works
 
