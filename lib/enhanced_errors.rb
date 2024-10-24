@@ -378,13 +378,12 @@ class EnhancedErrors
       events << :rescue if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3.0')
 
       @trace = TracePoint.new(*events) do |tp|
-        exception = tp.raised_exception
-        capture_me = EnhancedErrors.eligible_for_capture.call(exception)
-
-        next unless capture_me
-
         next if Thread.current[:enhanced_errors_processing]
         Thread.current[:enhanced_errors_processing] = true
+        exception = tp.raised_exception
+        capture_me = EnhancedErrors.eligible_for_capture.call(exception)
+        next unless capture_me
+
 
         exception = tp.raised_exception
         binding_context = tp.binding
@@ -461,6 +460,8 @@ class EnhancedErrors
         else
           puts "Invalid binding_info returned from on_capture, skipping."
         end
+      rescue => e
+        puts "Error in TracePoint block: #{e.message}"
       ensure
         Thread.current[:enhanced_errors_processing] = false
       end
@@ -472,7 +473,10 @@ class EnhancedErrors
     #
     # @return [String, nil] The current test name or `nil` if not in a test context.
     def test_name
-      return RSpec&.current_example&.full_description if defined?(RSpec)
+      if defined?(RSpec)
+        return RSpec&.current_example&.full_description
+      end
+    rescue => e
       nil
     end
 
