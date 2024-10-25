@@ -1,7 +1,7 @@
 module ErrorEnhancements
   def message
     original_message = super()
-    "#{original_message}#{variables_message}"
+    "#{original_message}\n#{variables_message}"
   rescue => e
     puts "Error in message method: #{e.message}"
     original_message
@@ -29,6 +29,7 @@ module ErrorEnhancements
     # Grab the last rescue binding if we have one
 
     bindings_of_interest = []
+
     binding_infos.each do |info|
       if info[:capture_type] == 'raise' && !info[:library]
         bindings_of_interest << info
