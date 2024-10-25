@@ -335,7 +335,8 @@ class EnhancedErrors
     # @param binding_info [Hash] The binding information to format.
     # @return [String] The formatted string.
     def binding_info_string(binding_info)
-      result = "\n#{Colors.green("#{binding_info[:capture_type].capitalize}: ")}#{Colors.blue(binding_info[:source])}"
+      capture_type = binding_info[:capture_type].to_s.capitalize
+      result = "#{Colors.red(capture_type)}: #{Colors.blue(binding_info[:source])}"
 
       result += method_and_args_desc(binding_info[:method_and_args])
 
@@ -363,7 +364,7 @@ class EnhancedErrors
       if result.length > max_length
         result = result[0...max_length] + "... (truncated)"
       end
-      result + "\n\n"
+      result + "\n"
     end
 
     private
@@ -378,12 +379,11 @@ class EnhancedErrors
       events << :rescue if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3.0')
 
       @trace = TracePoint.new(*events) do |tp|
-        next if Thread.current[:enhanced_errors_processing]
+        next if Thread.current[:enhanced_errors_processing] || tp.raised_exception.is_a?(NoMemoryError)
         Thread.current[:enhanced_errors_processing] = true
         exception = tp.raised_exception
         capture_me = EnhancedErrors.eligible_for_capture.call(exception)
         next unless capture_me
-
 
         exception = tp.raised_exception
         binding_context = tp.binding
@@ -444,7 +444,7 @@ class EnhancedErrors
             globals: globals
           },
           exception: exception.class.name,
-          capture_type: capture_type
+          capture_type: capture_type.to_s
         }
 
         if on_capture_hook
