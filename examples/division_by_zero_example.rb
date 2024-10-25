@@ -13,4 +13,22 @@ def foo
   end
 end
 
+def baz
+  i.dontexist
+end
+
+def boo
+    seeme = 'youshould'
+    baz
+  rescue => e
+    puts e.message
+end
+
+
+puts "\n--- Example with raise ---\n\n\n"
+
 foo
+
+puts "\n--- Example with raise and rescue (requires ruby 3.2 or greater to see rescue) ---\n\n\n"
+
+boo
