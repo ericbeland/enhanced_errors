@@ -1,7 +1,7 @@
 require './lib/enhanced_errors'
 require 'awesome_print' # Optional, for better output
 
-EnhancedErrors.enhance!(capture_events: :rescue)
+EnhancedErrors.enhance!
 
 def foo
   begin
