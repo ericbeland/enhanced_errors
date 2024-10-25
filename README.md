@@ -337,7 +337,7 @@ gem 'awesome_print'
 ## Performance Considerations
 
 - **Minimal Overhead**: Since TracePoint is only activated during exception raising and rescuing, the performance impact is negligible during normal operation.
-- **Production Safe**: The gem is designed to be safe for production use, giving you valuable insights without compromising performance.
+- **Production Safe**: The gem is designed to be safe for production use, giving you valuable insights without compromising performance. Although this is the case, I'd still suggest letting it get well-vetted before making the leap.
 
 ## Contributing
 
