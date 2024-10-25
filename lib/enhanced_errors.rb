@@ -147,7 +147,8 @@ class EnhancedErrors
     # @param options [Hash] Additional configuration options.
     # @yield [void] A block for additional configuration.
     # @return [void]
-    def enhance!(enabled: true, debug: false, **options, &block)
+    def enhance!(enabled: true, debug: false, capture_events: default_capture_events, **options, &block)
+      capture_events = Array(capture_events)
       @output_format = nil
       @eligible_for_capture = nil
       @original_global_variables = nil
@@ -160,6 +161,7 @@ class EnhancedErrors
         @debug = debug
         @original_global_variables = global_variables
 
+        validate_and_set_capture_events(capture_events)
         options.each do |key, value|
           setter_method = "#{key}="
           if respond_to?(setter_method)
@@ -323,7 +325,7 @@ class EnhancedErrors
     # @param binding_info [Hash] The binding information to validate.
     # @return [Hash, nil] The validated binding information or `nil` if invalid.
     def validate_binding_format(binding_info)
-      unless binding_info.keys.include?(:capture_type) && binding_info[:variables].is_a?(Hash)
+      unless binding_info.keys.include?(:capture_event) && binding_info[:variables].is_a?(Hash)
         puts "Invalid binding_info format."
         return nil
       end
@@ -335,8 +337,8 @@ class EnhancedErrors
     # @param binding_info [Hash] The binding information to format.
     # @return [String] The formatted string.
     def binding_info_string(binding_info)
-      capture_type = binding_info[:capture_type].to_s.capitalize
-      result = "#{Colors.red(capture_type)}: #{Colors.blue(binding_info[:source])}"
+      capture_event = binding_info[:capture_event].to_s.capitalize
+      result = "#{Colors.red(capture_event)}: #{Colors.blue(binding_info[:source])}"
 
       result += method_and_args_desc(binding_info[:method_and_args])
 
@@ -375,8 +377,7 @@ class EnhancedErrors
     def start_tracing
       return if @trace && @trace.enabled?
 
-      events = [:raise]
-      events << :rescue if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3.0')
+      events = @capture_events ? @capture_events.to_a : [:raise]
 
       @trace = TracePoint.new(*events) do |tp|
         next if Thread.current[:enhanced_errors_processing] || tp.raised_exception.is_a?(NoMemoryError)
@@ -425,10 +426,9 @@ class EnhancedErrors
           globals = (global_variables - @original_global_variables).map { |var|
             [var, get_global_variable_value(var)]
           }.to_h
-          puts "Global Variables: #{globals.inspect}"
         end
 
-        capture_type = tp.event.to_s  # 'raise' or 'rescue'
+        capture_event = tp.event.to_s  # 'raise' or 'rescue'
         location = "#{tp.path}:#{tp.lineno}"
 
         binding_info = {
@@ -444,7 +444,7 @@ class EnhancedErrors
             globals: globals
           },
           exception: exception.class.name,
-          capture_type: capture_type.to_s
+          capture_event: capture_event.to_s
         }
 
         if on_capture_hook
@@ -469,6 +469,7 @@ class EnhancedErrors
       @trace.enable
     end
 
+
     # Retrieves the current test name from RSpec, if available.
     #
     # @return [String, nil] The current test name or `nil` if not in a test context.
@@ -478,6 +479,42 @@ class EnhancedErrors
       end
     rescue => e
       nil
+    end
+
+    # Helper method to determine the default capture types based on Ruby version
+    #
+    # @return [Set<Symbol>] The default set of capture types
+    def default_capture_events
+      default_events = [:raise]
+      default_events << :rescue if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3.0')
+      Set.new(default_events)
+    end
+
+    def validate_and_set_capture_events(capture_events)
+      if capture_events.nil? || !valid_capture_events?(capture_events)
+        puts "EnhancedErrors: Invalid capture_events provided. Falling back to defaults."
+        capture_events = default_capture_events
+      end
+
+      if Gem::Version.new(RUBY_VERSION) < Gem::Version.new('3.3.0') && capture_events.include?(:rescue)
+        puts "EnhancedErrors: Warning: :rescue capture_event is not supported in Ruby versions below 3.3.0 and will be ignored."
+        capture_events.delete(:rescue)
+      end
+
+      if capture_events.empty?
+        puts "No valid capture_events provided to EnhancedErrors.enhance! Falling back to defaults."
+        capture_events = default_capture_events
+      end
+
+      @capture_events = capture_events.to_a
+    end
+
+
+    # Validate capture_events: must be an Array or Set containing only :raise and/or :rescue.
+    def valid_capture_events?(capture_events)
+      return false unless capture_events.is_a?(Array) || capture_events.is_a?(Set)
+      valid_types = [:raise, :rescue].to_set
+      capture_events.to_set.subset?(valid_types)
     end
 
     # Extracts method arguments from the TracePoint binding.

@@ -91,37 +91,34 @@
 
 <h5 id="label-Output-3A">Output:</h5>
 
-<p>&lt;img src=“./doc/images/enhanced-error.png” style=“height: 171px; width: 440px;”&gt;&lt;/img&gt;</p>
-
-<p><br></p>
+<p>&lt;img src=“./doc/images/enhanced-error.png” style=“height: 215px; width: 429px;”&gt;&lt;/img&gt; <br></p>
 
 <h4 id="label-Enhanced+Exception+In+Specs-3A">Enhanced Exception In Specs:</h4>
 
-<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_describe'>describe</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>attains enlightenment</span><span class='tstring_end'>&#39;</span></span> <span class='kw'>do</span>
-    <span class='id identifier rubyid_let'>let</span><span class='lparen'>(</span><span class='symbol'>:the_matrix</span><span class='rparen'>)</span> <span class='lbrace'>{</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>code rains, dramatically</span><span class='tstring_end'>&#39;</span></span> <span class='rbrace'>}</span>
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_describe'>describe</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>sees through</span><span class='tstring_end'>&#39;</span></span> <span class='kw'>do</span>
 
-    <span class='id identifier rubyid_before'>before</span><span class='lparen'>(</span><span class='symbol'>:each</span><span class='rparen'>)</span> <span class='kw'>do</span>
-      <span class='ivar'>@spoon</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>there is no spoon</span><span class='tstring_end'>&#39;</span></span>
-    <span class='kw'>end</span>
+  <span class='id identifier rubyid_let'>let</span><span class='lparen'>(</span><span class='symbol'>:the_matrix</span><span class='rparen'>)</span> <span class='lbrace'>{</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>code rains, dramatically</span><span class='tstring_end'>&#39;</span></span> <span class='rbrace'>}</span>
 
-    <span class='id identifier rubyid_it'>it</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>in the matrix</span><span class='tstring_end'>&#39;</span></span> <span class='kw'>do</span>
-      <span class='comment'>#activate memoized item
-</span>      <span class='id identifier rubyid_the_matrix'>the_matrix</span>
-      <span class='id identifier rubyid_stop'>stop</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>bullets</span><span class='tstring_end'>&#39;</span></span>
-      <span class='id identifier rubyid_raise'>raise</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>No!</span><span class='tstring_end'>&#39;</span></span>
-    <span class='kw'>end</span>
+  <span class='id identifier rubyid_before'>before</span><span class='lparen'>(</span><span class='symbol'>:each</span><span class='rparen'>)</span> <span class='kw'>do</span>
+    <span class='ivar'>@spoon</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>there is no spoon</span><span class='tstring_end'>&#39;</span></span>
   <span class='kw'>end</span>
+
+  <span class='id identifier rubyid_it'>it</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>the matrix</span><span class='tstring_end'>&#39;</span></span> <span class='kw'>do</span>
+    <span class='comment'>#activate memoized item
+</span>    <span class='id identifier rubyid_the_matrix'>the_matrix</span>
+    <span class='id identifier rubyid_stop'>stop</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>bullets</span><span class='tstring_end'>&#39;</span></span>
+    <span class='id identifier rubyid_raise'>raise</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>No!</span><span class='tstring_end'>&#39;</span></span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span>
 </code></pre>
 
 <h4 id="label-Output-3A">Output:</h4>
 
-<p>&lt;img src=“./doc/images/enhanced-spec.png” style=“height: 426px; width: 712px;”&gt;&lt;/img&gt;</p>
+<p>&lt;img src=“./doc/images/enhanced-spec.png” style=“height: 369px; width: 712px;”&gt;&lt;/img&gt;</p>
 
 <h2 id="label-Features">Features</h2>
 <ul><li>
-<p><strong>Pure Ruby</strong>: No external dependencies or C extensions.</p>
-</li><li>
-<p><strong>Standalone</strong>: Does not rely on any external libraries.</p>
+<p><strong>Pure Ruby</strong>: No external dependencies, C extensions, or C API calls.</p>
 </li><li>
 <p><strong>Lightweight</strong>: Minimal performance impact, as tracing is only active during exception raising.</p>
 </li><li>
@@ -208,6 +205,8 @@
 <p><code>max_length</code>: Sets the maximum length of the enhanced message (default: <code>2500</code>).</p>
 </li></ul>
 
+<p>Currently, the first <code>raise</code> exception binding is presented. This may be changed in the future to allow more binding data to be presented.</p>
+
 <h3 id="label-Environment-Based+Defaults">Environment-Based Defaults</h3>
 
 <p>EnhancedErrors adjusts its default settings based on the environment:</p>
@@ -270,7 +269,7 @@
     globals: globals
   },
   exception: exception.class.name,
-  capture_type: capture_type # &#39;raise&#39; or &#39;rescue&#39;
+  capture_event: capture_event # &#39;raise&#39; or &#39;rescue&#39;
 }
 </code></pre>
 
@@ -321,7 +320,7 @@
 <ul><li>
 <p><strong>Info Level</strong>: Respects the skip list, excluding predefined sensitive or irrelevant variables. Global variables are ignored.</p>
 </li><li>
-<p><strong>Debug Level</strong>: Ignores the skip lists, capturing all variables including those typically excluded and global variables.  Global variables,</p>
+<p><strong>Debug Level</strong>: Ignores the skip lists, capturing all variables including those typically excluded and global variables.  Global variables are only captured in debug mode, and they exclude the default Ruby global variables.</p>
 </li></ul>
 
 <p><strong>Default Behavior</strong>: By default, <code>info</code> level is used, which excludes variables in the skip list to protect sensitive information. In <code>debug</code> mode, the skip lists are ignored to provide more comprehensive data, which is useful during development but should be used cautiously to avoid exposing sensitive data. The info mode is recommended.</p>
@@ -335,7 +334,7 @@
 <p><strong><code>rescue</code></strong>: Captures the context when an exception is last rescued.</p>
 </li></ul>
 
-<p><strong>Default Behavior</strong>: By default, EnhancedErrors returns the first <code>raise</code> and the last <code>rescue</code> event for each exception. This provides a clear picture of where and how the exception was handled.</p>
+<p><strong>Default Behavior</strong>: By default, EnhancedErrors returns the first <code>raise</code> and the last <code>rescue</code> event for each exception. The <code>rescue</code> exception is only available in Ruby 3.2+ as it was added to TracePoint events in Ruby 3.2.</p>
 
 <h3 id="label-Example-3A+Redacting+Sensitive+Information">Example: Redacting Sensitive Information</h3>
 
@@ -347,35 +346,6 @@
     <span class='kw'>end</span>
   <span class='kw'>end</span>
   <span class='id identifier rubyid_binding_info'>binding_info</span>
-<span class='kw'>end</span>
-</code></pre>
-
-<h3 id="label-Example-3A+Encrypting+Data+in+Custom+Format">Example: Encrypting Data in Custom Format</h3>
-
-<pre class="code ruby"><code class="ruby"><span class='comment'># config/initializers/encryption.rb
-</span>
-<span class='id identifier rubyid_require'>require</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>active_support</span><span class='tstring_end'>&#39;</span></span>
-
-<span class='comment'># Retrieve the encryption key from Rails credentials or environment variables
-</span><span class='const'>ENCRYPTION_KEY</span> <span class='op'>=</span> <span class='const'>Rails</span><span class='period'>.</span><span class='id identifier rubyid_application'>application</span><span class='period'>.</span><span class='id identifier rubyid_credentials'>credentials</span><span class='period'>.</span><span class='id identifier rubyid_encryption_key'>encryption_key</span> <span class='op'>||</span> <span class='const'>ENV</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>ENCRYPTION_KEY</span><span class='tstring_end'>&#39;</span></span><span class='rbracket'>]</span>
-
-<span class='comment'># It&#39;s recommended to use a 256-bit key (32 bytes)
-</span><span class='comment'># If your key is in hex or another format, ensure it&#39;s properly decoded
-</span><span class='id identifier rubyid_key'>key</span> <span class='op'>=</span> <span class='const'>ActiveSupport</span><span class='op'>::</span><span class='const'>KeyGenerator</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='const'>ENCRYPTION_KEY</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_generate_key'>generate_key</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>enhanced_errors</span><span class='tstring_end'>&#39;</span></span><span class='comma'>,</span> <span class='int'>32</span><span class='rparen'>)</span>
-<span class='const'>ENCRYPTOR</span> <span class='op'>=</span> <span class='const'>ActiveSupport</span><span class='op'>::</span><span class='const'>MessageEncryptor</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_key'>key</span><span class='rparen'>)</span>
-</code></pre>
-
-<pre class="code ruby"><code class="ruby">
-<span class='id identifier rubyid_require_relative'>require_relative</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>path_to/enhanced_errors</span><span class='tstring_end'>&#39;</span></span> <span class='comment'># Adjust the path accordingly
-</span><span class='id identifier rubyid_require'>require</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>active_support/message_encryptor</span><span class='tstring_end'>&#39;</span></span>
-
-<span class='comment'># Ensure the encryptor is initialized
-</span><span class='id identifier rubyid_encryptor'>encryptor</span> <span class='op'>=</span> <span class='const'>ENCRYPTOR</span>
-
-<span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_on_format'><span class='object_link'><a href="EnhancedErrors.html#on_format-class_method" title="EnhancedErrors.on_format (method)">on_format</a></span></span> <span class='op'>=</span> <span class='id identifier rubyid_lambda'>lambda</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_formatted_string'>formatted_string</span><span class='op'>|</span>
-  <span class='id identifier rubyid_encrypted_data'>encrypted_data</span> <span class='op'>=</span> <span class='id identifier rubyid_encryptor'>encryptor</span><span class='period'>.</span><span class='id identifier rubyid_encrypt_and_sign'>encrypt_and_sign</span><span class='lparen'>(</span><span class='id identifier rubyid_formatted_string'>formatted_string</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_encrypted_base64'>encrypted_base64</span> <span class='op'>=</span> <span class='const'>Base64</span><span class='period'>.</span><span class='id identifier rubyid_strict_encode64'>strict_encode64</span><span class='lparen'>(</span><span class='id identifier rubyid_encrypted_data'>encrypted_data</span><span class='rparen'>)</span>
-  <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>ENCRYPTED[</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_encrypted_base64'>encrypted_base64</span><span class='embexpr_end'>}</span><span class='tstring_content'>]</span><span class='tstring_end'>&quot;</span></span>
 <span class='kw'>end</span>
 </code></pre>
 
@@ -394,7 +364,7 @@
 <p><strong>Global Variables</strong>: Global variables, in debug mode.</p>
 </li></ul>
 
-<p>The captured data includes a <code>capture_type</code> field indicating whether the data was captured during a <code>raise</code> or <code>rescue</code> event. By default, EnhancedErrors returns the first <code>raise</code> and the last <code>rescue</code> event for each exception, providing a clear trace of the exception lifecycle.</p>
+<p>The captured data includes a <code>capture_event</code> field indicating whether the data was captured during a <code>raise</code> or <code>rescue</code> event. By default, EnhancedErrors returns the first <code>raise</code> and the last <code>rescue</code> event for each exception, providing a clear trace of the exception lifecycle.</p>
 
 <p>The captured data is then appended to the exception’s message, providing rich context for debugging.</p>
 
@@ -409,7 +379,7 @@
 <ul><li>
 <p><strong>Minimal Overhead</strong>: Since TracePoint is only activated during exception raising and rescuing, the performance impact is negligible during normal operation.</p>
 </li><li>
-<p><strong>Production Safe</strong>: The gem is designed to be safe for production use, giving you valuable insights without compromising performance.</p>
+<p><strong>Production Safe</strong>: The gem is designed to be safe for production use, giving you valuable insights without compromising performance. Although this is the case, I’d still suggest letting it get well-vetted before making the leap.</p>
 </li></ul>
 
 <h2 id="label-Contributing">Contributing</h2>
@@ -422,7 +392,7 @@
 </div></div>
 
       <div id="footer">
-  Generated on Tue Oct 22 23:16:25 2024 by
+  Generated on Fri Oct 25 11:07:02 2024 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.37 (ruby-3.1.3).
 </div>

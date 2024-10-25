@@ -24,7 +24,7 @@ RSpec.describe EnhancedErrors do
             globals: {}
           },
           exception: "StandardError",
-          capture_type: "raise"
+          capture_event: "raise"
         }
       ]
     end
@@ -65,6 +65,70 @@ RSpec.describe EnhancedErrors do
         expect(EnhancedErrors.get_default_format_for_environment).to eq(:json)
 
         ENV.delete('RAILS_ENV')
+      end
+    end
+
+    context 'capture_events' do
+      let(:original_ruby_version) { RUBY_VERSION }
+
+      before do
+        EnhancedErrors.instance_variable_set(:@capture_events, nil)
+        allow(EnhancedErrors).to receive(:start_tracing)
+      end
+
+      after do
+        stub_const('RUBY_VERSION', original_ruby_version)
+      end
+
+      describe 'capture_events behavior' do
+        context 'when capture_events is not provided (default behavior)' do
+          context 'with Ruby version >= 3.3.0' do
+            before { stub_const('RUBY_VERSION', '3.3.0') }
+
+            it 'sets @capture_events to [:raise, :rescue]' do
+              EnhancedErrors.send(:validate_and_set_capture_events, nil)
+              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise, :rescue])
+            end
+          end
+
+          context 'with Ruby version < 3.3.0' do
+            before { stub_const('RUBY_VERSION', '3.2.0') }
+
+            it 'sets @capture_events to [:raise] only' do
+              EnhancedErrors.send(:validate_and_set_capture_events, nil)
+              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise])
+            end
+          end
+        end
+
+        context 'when capture_events is provided as an array' do
+          it 'captures only :raise' do
+            EnhancedErrors.send(:validate_and_set_capture_events, [:raise])
+            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise])
+          end
+
+          it 'captures only :rescue with Ruby >= 3.3.0' do
+            stub_const('RUBY_VERSION', '3.3.0')
+            EnhancedErrors.send(:validate_and_set_capture_events, [:rescue])
+            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:rescue])
+          end
+
+          it 'captures both :raise and :rescue with Ruby >= 3.3.0' do
+            stub_const('RUBY_VERSION', '3.3.0')
+            EnhancedErrors.send(:validate_and_set_capture_events, [:raise, :rescue])
+            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise, :rescue])
+          end
+
+          it 'ignores :rescue with Ruby < 3.3.0 and prints a warning' do
+            stub_const('RUBY_VERSION', '3.2.0')
+            expect {
+              EnhancedErrors.send(:validate_and_set_capture_events, [:raise, :rescue])
+            }.to output(/Warning: :rescue capture_event is not supported/).to_stdout
+
+            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise])
+          end
+
+        end
       end
     end
 
@@ -168,8 +232,8 @@ RSpec.describe EnhancedErrors do
         end
       end
 
-      describe 'capture_type field in binding info' do
-        it 'has capture_type set to "raise" when an exception is raised' do
+      describe 'capture_event field in binding info' do
+        it 'has capture_event set to "raise" when an exception is raised' do
           captured_binding_infos = []
           EnhancedErrors.on_capture do |binding_info|
             captured_binding_infos << binding_info
@@ -182,10 +246,10 @@ RSpec.describe EnhancedErrors do
             @exception = e
           end
 
-          expect(captured_binding_infos.first[:capture_type]).to eq('raise')
+          expect(captured_binding_infos.first[:capture_event]).to eq('raise')
         end
 
-        it 'has capture_type set to "rescue" when an exception is rescued' do
+        it 'has capture_event set to "rescue" when an exception is rescued' do
           if Gem::Version.new(RUBY_VERSION) < Gem::Version.new('3.3.0')
             skip 'Ruby version does not support :rescue event in TracePoint'
           end
@@ -202,9 +266,9 @@ RSpec.describe EnhancedErrors do
             # Exception is rescued here
           end
 
-          rescue_info = captured_binding_infos.find { |info| info[:capture_type] == 'rescue' }
+          rescue_info = captured_binding_infos.find { |info| info[:capture_event] == 'rescue' }
           expect(rescue_info).not_to be_nil
-          expect(rescue_info[:capture_type]).to eq('rescue')
+          expect(rescue_info[:capture_event]).to eq('rescue')
         end
       end
     end

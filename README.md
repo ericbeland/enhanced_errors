@@ -202,7 +202,7 @@ it yields out a hash with the structure below. Modify it as needed and return th
     globals: globals
   },
   exception: exception.class.name,
-  capture_type: capture_type # 'raise' or 'rescue'
+  capture_event: capture_event # 'raise' or 'rescue'
 }
 ```
 
@@ -316,7 +316,7 @@ When an exception is raised or rescued, it captures:
 - **Let Variables**: RSpec let variables, if applicable. Only memoized (evaluated) let variables are captured.
 - **Global Variables**: Global variables, in debug mode.
 
-The captured data includes a `capture_type` field indicating whether the data was captured during a `raise` or `rescue` event. By default, EnhancedErrors returns the first `raise` and the last `rescue` event for each exception, providing a clear trace of the exception lifecycle.
+The captured data includes a `capture_event` field indicating whether the data was captured during a `raise` or `rescue` event. By default, EnhancedErrors returns the first `raise` and the last `rescue` event for each exception, providing a clear trace of the exception lifecycle.
 
 The captured data is then appended to the exception's message, providing rich context for debugging.
 

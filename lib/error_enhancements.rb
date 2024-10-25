@@ -31,7 +31,7 @@ module ErrorEnhancements
     bindings_of_interest = []
 
     binding_infos.each do |info|
-      if info[:capture_type] == 'raise' && !info[:library]
+      if info[:capture_event] == 'raise' && !info[:library]
         bindings_of_interest << info
         break
       end
@@ -43,7 +43,7 @@ module ErrorEnhancements
 
     # find the last rescue binding if there is one
     binding_infos.reverse.each do |info|
-      if info[:capture_type] == 'rescue'
+      if info[:capture_event] == 'rescue'
         bindings_of_interest << info
         break
       end
