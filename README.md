@@ -64,14 +64,14 @@ end
 ## Features
 
 - **Pure Ruby**: No external dependencies, C extensions, or C API calls.
-- **Lightweight**: Minimal performance impact, as tracing is only active during exception raising.
 - **Customizable Output**: Supports multiple output formats (`:json`, `:plaintext`, `:terminal`).
-- **Flexible Hooks**: Redact or modifying captured data via the `on_capture` hook.
+- **Flexible Hooks**: Redact or modifying captured data via the `on_capture` hook. Update the final string with on_format.
 - **Environment-Based Defaults**: For Rails apps, automatically adjusts settings based on the environment (`development`, `test`, `production`, `ci`).
 - **Pre-Populated Skip List**: Comes with predefined skip lists to exclude irrelevant variables from being captured.
 - **Capture Levels**: Supports `info` and `debug` levels, where `debug` level ignores the skip lists for more comprehensive data capture.
 - **Capture Types**: Captures variables from the first `raise` and the last `rescue` for an exception by default.
 - **No dependencies**:  EnhancedErrors does not ___require___ any dependencies--it uses [awesome_print](https://github.com/awesome-print/awesome_print) for nicer output if it is installed and available.
+- **Lightweight**: Minimal performance impact, as tracing is only active during exception raising.
 
 EnhancedErrors has a few big use-cases:
 
@@ -79,20 +79,18 @@ EnhancedErrors has a few big use-cases:
 You also can't just print out all the data, because it's too big. You want to know what the data was the cause of the error.
 Ideally, without long instrument-re-run-fix loops. If your logging didn't capture the data, normally, you'd be stuck. 
 
-* **Debug** a complex application erroring deep in the stack when you can't tell where the error originates
-
-* **Faster TDD** - Often, you won't have to re-run to see an error--you can go straight to the fix.
+* **Debug** a complex application erroring deep in the stack when you can't tell where the error originates.
 
 * **Faster CI -> Fix loop**. When a bug happens in CI, usually there's a step where you first reproduce it locally.
   EnhancedErrors can help you skip that step.
 
-* **Faster debugging**. In general, you can skip the add-instrumentation step and jump to the fix.
+* **Faster TDD**. In general, you can skip the add-instrumentation step and jump to the fix. Usually, you won't have to re-run to see an error.
 
 * **Heisenbugs** - bugs that disappear when you try to debug them. EnhancedErrors can help you capture the data that causes the bug before it disappears.
 
 * **Unknown Unknowns** - you can't pre-emptively log variables from failure cases you never imagined.
 
-* **Cron jobs** and **daemons** - when it fails for unknown reasons at 4am, check the log and fix--it probably has what you need.
+* **Cron jobs** and **daemons** - when it fails for unknown reasons at 4am, check the log and fix--it probably has what you need. Note that 
 
 ## Installation
 
@@ -337,7 +335,8 @@ gem 'awesome_print'
 ## Performance Considerations
 
 - **Minimal Overhead**: Since TracePoint is only activated during exception raising and rescuing, the performance impact is negligible during normal operation.
-- **Production Safe**: The gem is designed to be safe for production use, giving you valuable insights without compromising performance. Although this is the case, I'd still suggest letting it get well-vetted before making the leap.
+
+- **Goal: Production Safety**: The gem is designed to, once vetted, be safe for production use, giving you valuable insights without compromising performance. I suggest letting it get well-vetted before making the leap and testing it for both performance and memory under load internally, as well.
 
 ## Contributing
 
