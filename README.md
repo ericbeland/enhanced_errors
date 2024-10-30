@@ -81,6 +81,8 @@ Ideally, without long instrument-re-run-fix loops. If your logging didn't captur
 
 * **Debug** a complex application erroring deep in the stack when you can't tell where the error originates.
 
+* **Reduce MTTR** Reduce mean time to resolution.
+
 * **Faster CI -> Fix loop**. When a bug happens in CI, usually there's a step where you first reproduce it locally.
   EnhancedErrors can help you skip that step.
 
@@ -331,10 +333,36 @@ if you want to use it.
 gem 'awesome_print'
 ```
 
+## Alternatives
+
+Why not use:
+
+[binding_of_caller](https://github.com/banister/binding_of_caller) or [Pry](https://github.com/pry/pry) or [better_errors](https://github.com/BetterErrors/better_errors)?
+
+First off, these gems are, I cannot stress this enough, a-m-a-z-i-n-g!!! I use them every day--kudos to their creators and maintainers!
+
+This is intended for different use-cases. In sum, the goal of this gem is an every-day driver for __non-interactive__ variable inspection. 
+
+With EnhancedErrors is that I want extra details when I run into a problem I __didn't anticipate ahead of time__.
+To make that work, it has to be able to safely be 'on' all the time, and it has to gather the data in
+a way I naturally will see it without requiring extra preparation I obviously didn't know to do.
+
+- That won't interrupt CI, but also, that lets me know what happened without reproduction
+- That could, theoretically, also be fine in production (if data security, redaction, access, and encryption concerns were all addressed--Ok, big
+list, but another option is to selectively enable targeted capture)
+- Has decent performance characteristics
+- **Only** becomes active in exception raise/rescue scenarios
+
+This gem could have been implemented using binding_of_caller, or the gem it depends on, [debug_inspector](https://rubygems.org/gems/debug_inspector/versions/1.1.0?locale=en). 
+However, the recommendation is not to use those in production as they use C API extensions. This doesn't. This selectively uses 
+Ruby's TracePoint binding capture very narrowly with no other C API or dependencies, and only to target Exceptions--not to allow universal calls to the prior binding. It doesn't work as a debugger, but that also means it can, with care, operate safely in a narrow scope--becoming active only when exceptions are raised.
+
 
 ## Performance Considerations
 
-- **Minimal Overhead**: Since TracePoint is only activated during exception raising and rescuing, the performance impact is negligible during normal operation.
+- **Minimal Overhead**: Since TracePoint is only activated during exception raising and rescuing, the performance impact is negligible during normal operation. (Benchmark included)
+
+- **TBD**: Memory considerations. This does capture data when an exception happens. EnhancedErrors hides under the bed when it sees **NoMemoryError**.
 
 - **Goal: Production Safety**: The gem is designed to, once vetted, be safe for production use, giving you valuable insights without compromising performance. I suggest letting it get well-vetted before making the leap and testing it for both performance and memory under load internally, as well.
 
