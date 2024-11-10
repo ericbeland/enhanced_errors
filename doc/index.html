@@ -314,6 +314,25 @@
 
 <p>The skip list is pre-populated with common variables to exclude and can be extended based on your application’s requirements.</p>
 
+<h4 id="label-Capture+Rules">Capture Rules</h4>
+
+<p>These exceptions are always ignored:</p>
+
+<pre class="code ruby"><code class="ruby">SystemExit,
+NoMemoryError,
+SignalException,
+Interrupt,
+ScriptError,
+LoadError,
+NotImplementedError,
+SyntaxError,
+SystemStackError
+</code></pre>
+
+<p>While this is close to “Things that don’t descend from StandardError”, it’s not exactly that.</p>
+
+<p>In Info mode, variables starting with @_ are also ignored.</p>
+
 <h3 id="label-Capture+Levels">Capture Levels</h3>
 
 <p>EnhancedErrors supports different capture levels to control the verbosity of the captured data:</p>
@@ -392,7 +411,7 @@
 </div></div>
 
       <div id="footer">
-  Generated on Sun Nov 10 11:48:24 2024 by
+  Generated on Sun Nov 10 12:01:13 2024 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.37 (ruby-3.1.3).
 </div>

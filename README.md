@@ -266,6 +266,26 @@ end
 The skip list is pre-populated with common variables to exclude and can be extended based on your application's requirements. 
 
 
+#### Capture Rules
+
+These exceptions are always ignored:
+
+```ruby
+SystemExit,
+NoMemoryError,
+SignalException,
+Interrupt,
+ScriptError,
+LoadError,
+NotImplementedError,
+SyntaxError,
+SystemStackError
+```
+
+While this is close to "Things that don't descend from StandardError", it's not exactly that.
+
+In Info mode, variables starting with @_ are also ignored.
+
 
 ### Capture Levels
 
