@@ -5,6 +5,20 @@ require_relative 'colors'
 require_relative 'error_enhancements'
 require_relative 'binding'
 
+# While we could just catch StandardError, we would miss a number of things.
+
+IGNORED_EXCEPTIONS = [
+  SystemExit,
+  NoMemoryError,
+  SignalException,
+  Interrupt,
+  ScriptError,
+  LoadError,
+  NotImplementedError,
+  SyntaxError,
+  SystemStackError
+]
+
 # The EnhancedErrors class provides mechanisms to enhance exception handling by capturing
 # additional context such as binding information, variables, and method arguments when exceptions are raised.
 # It offers customization options for formatting and filtering captured data.
@@ -384,7 +398,7 @@ class EnhancedErrors
       events = @capture_events ? @capture_events.to_a : [:raise]
 
       @trace = TracePoint.new(*events) do |tp|
-        next if Thread.current[:enhanced_errors_processing] || tp.raised_exception.is_a?(NoMemoryError)
+        next if Thread.current[:enhanced_errors_processing] || IGNORED_EXCEPTIONS.include?(tp.raised_exception)
         Thread.current[:enhanced_errors_processing] = true
         exception = tp.raised_exception
         capture_me = EnhancedErrors.eligible_for_capture.call(exception)
