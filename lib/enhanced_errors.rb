@@ -350,7 +350,6 @@ class EnhancedErrors
 
       instance_vars_to_display = variables[:instances] || {}
 
-
       if instance_vars_to_display && !instance_vars_to_display.empty?
         result += "\n#{Colors.green('Instances:')}\n#{variable_description(instance_vars_to_display)}"
       end
@@ -367,6 +366,11 @@ class EnhancedErrors
         result = result[0...max_length] + "... (truncated)"
       end
       result + "\n"
+    rescue => e
+      # we swallow and don't re-raise to avoid any recursion problems. We don't want to
+      # mess up the original exception handling.
+      puts "EnhancedErrors error in binding_info_string: #{e.message} #{e.backtrace}"
+      return ''
     end
 
     private
@@ -597,6 +601,8 @@ class EnhancedErrors
     # @return [String] The formatted variable.
     def format_variable(variable)
       (awesome_print_available? && Colors.enabled?) ? variable.ai : variable.inspect
+    rescue => e
+      return "#{variable.to_s.truncate(30)}: [Inspection Error]"
     end
 
     # Checks if the `AwesomePrint` gem is available.
