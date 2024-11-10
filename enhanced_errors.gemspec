@@ -1,10 +1,10 @@
 Gem::Specification.new do |spec|
   spec.name = "enhanced_errors"
-  spec.version = "0.1.5"
+  spec.version = "0.1.6"
   spec.authors = ["Eric Beland"]
 
   spec.summary = "Automatically enhance your errors with messages containing variable values from the moment they were raised."
-  spec.description = "With no extra dependencies, and using only Ruby's built-in TracePoint, EnhancedErrors will automatically enhance your errors with messages containing variable values from the moment they were raised."
+  spec.description = "EnhancedErrors will automatically enhance your errors with messages containing variable values from the moment they were raised, using no extra dependencies, and only Ruby's built-in TracePoint. "
   spec.homepage = "https://github.com/ericbeland/enhanced_errors"
   spec.required_ruby_version = ">= 3.0.0"
 
