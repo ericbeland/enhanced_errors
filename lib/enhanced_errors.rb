@@ -313,7 +313,7 @@ class EnhancedErrors
     def apply_skip_list(binding_info)
       unless @debug
         variables = binding_info[:variables]
-        variables[:instances]&.reject! { |var, _| skip_list.include?(var) || var.to_s.start_with?('@__') }
+        variables[:instances]&.reject! { |var, _| skip_list.include?(var) || (var.to_s.start_with?('@_') && !@debug) }
         variables[:locals]&.reject! { |var, _| skip_list.include?(var) }
         variables[:globals]&.reject! { |var, _| skip_list.include?(var) }
       end
