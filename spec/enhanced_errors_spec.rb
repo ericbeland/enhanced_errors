@@ -132,6 +132,28 @@ RSpec.describe EnhancedErrors do
       end
     end
 
+    context 'multiple variable appends' do
+      it 'only appends variables once' do
+        EnhancedErrors.enhance!
+        expect {
+        @foo = 'bar'
+        begin
+          raise RuntimeError.new('Foo')
+        rescue Exception => e
+          boo = 'baz'
+          begin
+            raise e
+          rescue => exception
+            raise exception # RuntimeError.new "Exception: #{exception}"
+            exception.message
+          end
+        end
+        }.to raise_error(RuntimeError) do |e|
+          expect(e.message).to include("@foo").once
+        end
+      end
+    end
+
     context 'variable exclusion' do
       it 'excludes variables in the skip list from binding information' do
         @variable_to_skip = 'should be skipped'

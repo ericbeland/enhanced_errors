@@ -1,9 +1,12 @@
 module ErrorEnhancements
   def message
     original_message = super()
-    "#{original_message}\n#{variables_message}"
+    if original_message.include?(variables_message)
+      original_message
+    else
+      "#{original_message}\n#{variables_message}"
+    end
   rescue => e
-    puts "Error in message method: #{e.message}"
     original_message
   end
 
