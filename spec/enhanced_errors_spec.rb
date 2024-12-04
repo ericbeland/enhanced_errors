@@ -176,13 +176,12 @@ RSpec.describe EnhancedErrors do
       end
 
       it 'skips @_ variables in info mode' do
-        @_variable_to_skip = 'should be skipped'
 
         EnhancedErrors.enhance!
         expect {
+          @_variable_to_skip = 'should be skipped'
           raise 'Test exception'
         }.to raise_error(StandardError) do |e|
-          raise "shit"
           expect(e.message).not_to include('@_variable_to_skip')
         end
       end
@@ -197,8 +196,6 @@ RSpec.describe EnhancedErrors do
           expect(e.message).to include('@_variable_to_skip')
         end
       end
-
-
     end
 
     context 'output truncation' do

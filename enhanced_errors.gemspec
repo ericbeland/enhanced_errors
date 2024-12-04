@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name = "enhanced_errors"
-  spec.version = "0.1.6"
+  spec.version = "0.1.7"
   spec.authors = ["Eric Beland"]
 
   spec.summary = "Automatically enhance your errors with messages containing variable values from the moment they were raised."

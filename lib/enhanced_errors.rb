@@ -84,7 +84,7 @@ class EnhancedErrors
                                 :@connection_subscriber,
                                 :@saved_pool_configs,
                                 :@loaded_fixtures,
-                                :@matcher_definitions,
+                                :@matcher_definitions
                               ])
 
     # A set of Rails-specific instance variables to skip.
@@ -103,7 +103,12 @@ class EnhancedErrors
                                 :@strict_loading,
                                 :@strict_loading_mode,
                                 :@mutations_before_last_save,
-                                :@mutations_from_database
+                                :@mutations_from_database,
+                                :@relation_delegate_cache,
+                                :@predicate_builder,
+                                :@generated_relation_method,
+                                :@find_by_statement_cache,
+                                :@arel_table
                               ])
 
     # Gets or sets the maximum length for the formatted exception message.
@@ -394,15 +399,17 @@ class EnhancedErrors
     # @return [void]
     def start_tracing
       return if @trace && @trace.enabled?
-
       events = @capture_events ? @capture_events.to_a : [:raise]
-
       @trace = TracePoint.new(*events) do |tp|
-        next if Thread.current[:enhanced_errors_processing] || IGNORED_EXCEPTIONS.include?(tp.raised_exception)
+        next if Thread.current[:enhanced_errors_processing] || ignored_exception?(tp.raised_exception)
         Thread.current[:enhanced_errors_processing] = true
         exception = tp.raised_exception
-        capture_me = EnhancedErrors.eligible_for_capture.call(exception)
-        next unless capture_me
+        capture_me = !exception.frozen? && EnhancedErrors.eligible_for_capture.call(exception)
+
+        unless capture_me
+          Thread.current[:enhanced_errors_processing] = false
+          next
+        end
 
         exception = tp.raised_exception
         binding_context = tp.binding
@@ -485,6 +492,13 @@ class EnhancedErrors
       end
 
       @trace.enable
+    end
+
+    def ignored_exception?(exception)
+      IGNORED_EXCEPTIONS.each do |klass|
+        return true if exception.is_a?(klass)
+      end
+      false
     end
 
 
@@ -583,7 +597,7 @@ class EnhancedErrors
       begin
         var.is_a?(Symbol) ? eval("#{var}") : nil
       rescue => e
-        "#<Error getting value: #{e.message}>"
+        "#<Error getting value for #{var}>" rescue '<value error>'
       end
     end
 
@@ -613,10 +627,20 @@ class EnhancedErrors
     #
     # @param variable [Object] The variable to format.
     # @return [String] The formatted variable.
+
     def format_variable(variable)
-      (awesome_print_available? && Colors.enabled?) ? variable.ai : variable.inspect
+      if awesome_print_available? && Colors.enabled?
+        variable.ai
+      else
+        variable.inspect
+      end
     rescue => e
-      return "#{variable.to_s.truncate(30)}: [Inspection Error]"
+      var_str = begin
+                  variable.to_s.truncate(30)
+                rescue
+                  "[Unprintable variable]"
+                end
+      return "#{var_str}: [Inspection Error]"
     end
 
     # Checks if the `AwesomePrint` gem is available.
