@@ -1,3 +1,5 @@
+# binding.rb
+
 module Debugging
   def let_vars_hash
     memoized_values = self.receiver.instance_variable_get(:@__memoized)&.instance_variable_get(:@memoized)
@@ -8,4 +10,3 @@ end
 class Binding
   include Debugging
 end
-

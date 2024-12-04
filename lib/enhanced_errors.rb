@@ -1,3 +1,5 @@
+# enhanced_errors.rb
+
 require 'set'
 require 'json'
 
@@ -6,7 +8,6 @@ require_relative 'error_enhancements'
 require_relative 'binding'
 
 # While we could just catch StandardError, we would miss a number of things.
-
 IGNORED_EXCEPTIONS = [
   SystemExit,
   NoMemoryError,
@@ -63,6 +64,11 @@ class EnhancedErrors
     #
     # @return [Set<Symbol>]
     attr_accessor :skip_list
+
+    # Determines whether to capture :rescue events.
+    #
+    # @return [Boolean]
+    attr_accessor :capture_rescue
 
     # Regular expression to identify gem paths.
     #
@@ -137,6 +143,19 @@ class EnhancedErrors
       @capture_let_variables
     end
 
+    # Gets or sets whether to capture :rescue events.
+    #
+    # @param value [Boolean, nil] The desired state. If `nil`, returns the current value.
+    # @return [Boolean] Whether :rescue events are being captured.
+    def capture_rescue(value = nil)
+      if value.nil?
+        @capture_rescue = @capture_rescue.nil? ? false : @capture_rescue
+      else
+        @capture_rescue = value
+      end
+      @capture_rescue
+    end
+
     # Retrieves the current skip list, initializing it with default values if not already set.
     #
     # @return [Set<Symbol>] The current skip list.
@@ -166,8 +185,7 @@ class EnhancedErrors
     # @param options [Hash] Additional configuration options.
     # @yield [void] A block for additional configuration.
     # @return [void]
-    def enhance!(enabled: true, debug: false, capture_events: default_capture_events, **options, &block)
-      capture_events = Array(capture_events)
+    def enhance!(enabled: true, debug: false, capture_events: nil, **options, &block)
       @output_format = nil
       @eligible_for_capture = nil
       @original_global_variables = nil
@@ -180,7 +198,6 @@ class EnhancedErrors
         @debug = debug
         @original_global_variables = global_variables
 
-        validate_and_set_capture_events(capture_events)
         options.each do |key, value|
           setter_method = "#{key}="
           if respond_to?(setter_method)
@@ -195,6 +212,7 @@ class EnhancedErrors
         @config_block = block_given? ? block : nil
         instance_eval(&@config_block) if @config_block
 
+        validate_and_set_capture_events(capture_events)
         start_tracing
       end
     end
@@ -259,7 +277,13 @@ class EnhancedErrors
     def format(captured_bindings = [], output_format = get_default_format_for_environment)
       result = binding_infos_array_to_string(captured_bindings, output_format)
       if @on_format_hook
-        result = @on_format_hook.call(result)
+        begin
+          result = @on_format_hook.call(result)
+        rescue => e
+          # Since the on_format_hook failed, do not display the data
+          result = ''
+          # Optionally, log the error safely if logging is guaranteed not to raise exceptions
+        end
       else
         result = default_on_format(result)
       end
@@ -345,7 +369,7 @@ class EnhancedErrors
     # @return [Hash, nil] The validated binding information or `nil` if invalid.
     def validate_binding_format(binding_info)
       unless binding_info.keys.include?(:capture_event) && binding_info[:variables].is_a?(Hash)
-        puts "Invalid binding_info format."
+        # Log or handle the invalid format as needed
         return nil
       end
       binding_info
@@ -356,10 +380,12 @@ class EnhancedErrors
     # @param binding_info [Hash] The binding information to format.
     # @return [String] The formatted string.
     def binding_info_string(binding_info)
-      capture_event = binding_info[:capture_event].to_s.capitalize
-      result = "#{Colors.red(capture_event)}: #{Colors.blue(binding_info[:source])}"
+      capture_event = safe_to_s(binding_info[:capture_event]).capitalize
+      source = safe_to_s(binding_info[:source])
+      result = "#{Colors.red(capture_event)}: #{Colors.blue(source)}"
 
-      result += method_and_args_desc(binding_info[:method_and_args])
+      method_desc = method_and_args_desc(binding_info[:method_and_args])
+      result += method_desc
 
       variables = binding_info[:variables] || {}
 
@@ -386,9 +412,7 @@ class EnhancedErrors
       end
       result + "\n"
     rescue => e
-      # we swallow and don't re-raise to avoid any recursion problems. We don't want to
-      # mess up the original exception handling.
-      puts "EnhancedErrors error in binding_info_string: #{e.message} #{e.backtrace}"
+      # Avoid raising exceptions during formatting
       return ''
     end
 
@@ -399,7 +423,7 @@ class EnhancedErrors
     # @return [void]
     def start_tracing
       return if @trace && @trace.enabled?
-      events = @capture_events ? @capture_events.to_a : [:raise]
+      events = @capture_events ? @capture_events.to_a : default_capture_events
       @trace = TracePoint.new(*events) do |tp|
         next if Thread.current[:enhanced_errors_processing] || ignored_exception?(tp.raised_exception)
         Thread.current[:enhanced_errors_processing] = true
@@ -411,7 +435,6 @@ class EnhancedErrors
           next
         end
 
-        exception = tp.raised_exception
         binding_context = tp.binding
 
         unless exception.instance_variable_defined?(:@binding_infos)
@@ -426,13 +449,13 @@ class EnhancedErrors
         }
 
         locals = binding_context.local_variables.map { |var|
-          [var, binding_context.local_variable_get(var)]
+          [var, safe_local_variable_get(binding_context, var)]
         }.to_h
 
         instance_vars = binding_context.receiver.instance_variables
 
         instances = instance_vars.map { |var|
-          [var, (binding_context.receiver.instance_variable_get(var) rescue "#<Error getting instance variable: #{$!.message}>")]
+          [var, safe_instance_variable_get(binding_context.receiver, var)]
         }.to_h
 
         # Extract 'let' variables from :@__memoized (RSpec specific)
@@ -453,8 +476,8 @@ class EnhancedErrors
           }.to_h
         end
 
-        capture_event = tp.event.to_s  # 'raise' or 'rescue'
-        location = "#{tp.path}:#{tp.lineno}"
+        capture_event = safe_to_s(tp.event)  # 'raise' or 'rescue'
+        location = "#{safe_to_s(tp.path)}:#{safe_to_s(tp.lineno)}"
 
         binding_info = {
           source: location,
@@ -468,25 +491,31 @@ class EnhancedErrors
             lets: lets,
             globals: globals
           },
-          exception: exception.class.name,
-          capture_event: capture_event.to_s
+          exception: safe_to_s(exception.class.name),
+          capture_event: capture_event
         }
 
+        binding_info = default_on_capture(binding_info) # Apply default processing
+
         if on_capture_hook
-          binding_info = on_capture_hook.call(binding_info)
-        else
-          binding_info = default_on_capture(binding_info)
+          begin
+            binding_info = on_capture_hook.call(binding_info)
+          rescue => e
+            # Since the on_capture_hook failed, do not capture this binding_info
+            binding_info = nil
+            # Optionally, log the error safely if logging is guaranteed not to raise exceptions
+          end
         end
 
-        binding_info = validate_binding_format(binding_info)
-
+        # Proceed only if binding_info is valid
         if binding_info
-          exception.instance_variable_get(:@binding_infos) << binding_info
-        else
-          puts "Invalid binding_info returned from on_capture, skipping."
+          binding_info = validate_binding_format(binding_info)
+          if binding_info
+            exception.instance_variable_get(:@binding_infos) << binding_info
+          end
         end
       rescue => e
-        puts "Error in TracePoint block: #{e.message}"
+        # Avoid any code here that could raise exceptions
       ensure
         Thread.current[:enhanced_errors_processing] = false
       end
@@ -494,22 +523,22 @@ class EnhancedErrors
       @trace.enable
     end
 
+    # Checks if the exception is in the ignored exceptions list.
+    #
+    # @param exception [Exception] The exception to check.
+    # @return [Boolean] `true` if the exception should be ignored, otherwise `false`.
     def ignored_exception?(exception)
-      IGNORED_EXCEPTIONS.each do |klass|
-        return true if exception.is_a?(klass)
-      end
-      false
+      IGNORED_EXCEPTIONS.any? { |klass| exception.is_a?(klass) }
     end
-
 
     # Retrieves the current test name from RSpec, if available.
     #
     # @return [String, nil] The current test name or `nil` if not in a test context.
     def test_name
       if defined?(RSpec)
-        return RSpec&.current_example&.full_description
+        RSpec&.current_example&.full_description
       end
-    rescue => e
+    rescue
       nil
     end
 
@@ -517,32 +546,47 @@ class EnhancedErrors
     #
     # @return [Set<Symbol>] The default set of capture types
     def default_capture_events
-      default_events = [:raise]
-      default_events << :rescue if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3.0')
-      Set.new(default_events)
+      events = [:raise]
+      if capture_rescue && Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3.0')
+        events << :rescue
+      end
+      Set.new(events)
     end
 
+    # Validates and sets the capture events for TracePoint.
+    #
+    # @param capture_events [Array<Symbol>, nil] The events to capture.
+    # @return [void]
     def validate_and_set_capture_events(capture_events)
-      if capture_events.nil? || !valid_capture_events?(capture_events)
-        puts "EnhancedErrors: Invalid capture_events provided. Falling back to defaults."
-        capture_events = default_capture_events
+      if capture_events.nil?
+        @capture_events = default_capture_events
+        return
       end
 
-      if Gem::Version.new(RUBY_VERSION) < Gem::Version.new('3.3.0') && capture_events.include?(:rescue)
+      unless valid_capture_events?(capture_events)
+        puts "EnhancedErrors: Invalid capture_events provided. Falling back to defaults."
+        @capture_events = default_capture_events
+        return
+      end
+
+      if capture_events.include?(:rescue) && Gem::Version.new(RUBY_VERSION) < Gem::Version.new('3.3.0')
         puts "EnhancedErrors: Warning: :rescue capture_event is not supported in Ruby versions below 3.3.0 and will be ignored."
-        capture_events.delete(:rescue)
+        capture_events = capture_events - [:rescue]
       end
 
       if capture_events.empty?
         puts "No valid capture_events provided to EnhancedErrors.enhance! Falling back to defaults."
-        capture_events = default_capture_events
+        @capture_events = default_capture_events
+        return
       end
 
-      @capture_events = capture_events.to_a
+      @capture_events = capture_events.to_set
     end
 
-
-    # Validate capture_events: must be an Array or Set containing only :raise and/or :rescue.
+    # Validates the capture events.
+    #
+    # @param capture_events [Array<Symbol>] The events to validate.
+    # @return [Boolean] `true` if valid, otherwise `false`.
     def valid_capture_events?(capture_events)
       return false unless capture_events.is_a?(Array) || capture_events.is_a?(Set)
       valid_types = [:raise, :rescue].to_set
@@ -564,8 +608,8 @@ class EnhancedErrors
         locals = bind.local_variables
 
         parameters.map do |(type, name)|
-          value = locals.include?(name) ? bind.local_variable_get(name) : nil
-          "#{name}=#{value.inspect}"
+          value = locals.include?(name) ? safe_local_variable_get(bind, name) : nil
+          "#{name}=#{safe_inspect(value)}"
         rescue => e
           "#{name}=#<Error getting argument: #{e.message}>"
         end.join(", ")
@@ -581,9 +625,9 @@ class EnhancedErrors
     # @return [String] The formatted object name.
     def determine_object_name(tp, method_name)
       if tp.self.is_a?(Class) && tp.self.singleton_class == tp.defined_class
-        "#{tp.self}.#{method_name}"
+        "#{safe_to_s(tp.self)}.#{method_name}"
       else
-        "#{tp.self.class.name}##{method_name}"
+        "#{safe_to_s(tp.self.class.name)}##{method_name}"
       end
     rescue => e
       "#<Error inspecting value: #{e.message}>"
@@ -597,7 +641,7 @@ class EnhancedErrors
       begin
         var.is_a?(Symbol) ? eval("#{var}") : nil
       rescue => e
-        "#<Error getting value for #{var}>" rescue '<value error>'
+        "#<Error getting value for #{var}>"
       end
     end
 
@@ -606,11 +650,14 @@ class EnhancedErrors
     # @param method_info [Hash] Information about the method and its arguments.
     # @return [String] The formatted description.
     def method_and_args_desc(method_info)
-      return '' unless method_info[:object_name] != '' || method_info[:args]&.length.to_i > 0
-      arg_str = method_info[:args]
-      arg_str = "(#{arg_str})" if arg_str != ""
-      str = method_info[:object_name] + arg_str
+      object_name = safe_to_s(method_info[:object_name])
+      args = safe_to_s(method_info[:args])
+      return '' if object_name.empty? && args.empty?
+      arg_str = args.empty? ? '' : "(#{args})"
+      str = object_name + arg_str
       "\n#{Colors.green('Method: ')}#{Colors.blue(str)}\n"
+    rescue => e
+      ''
     end
 
     # Generates a formatted description for a set of variables.
@@ -621,26 +668,23 @@ class EnhancedErrors
       vars_hash.map do |name, value|
         "  #{Colors.purple(name)}: #{format_variable(value)}\n"
       end.join
+    rescue => e
+      ''
     end
 
     # Formats a variable for display, using `awesome_print` if available and enabled.
     #
     # @param variable [Object] The variable to format.
     # @return [String] The formatted variable.
-
     def format_variable(variable)
       if awesome_print_available? && Colors.enabled?
         variable.ai
       else
-        variable.inspect
+        safe_inspect(variable)
       end
     rescue => e
-      var_str = begin
-                  variable.to_s.truncate(30)
-                rescue
-                  "[Unprintable variable]"
-                end
-      return "#{var_str}: [Inspection Error]"
+      var_str = safe_to_s(variable)
+      "#{var_str}: [Inspection Error]"
     end
 
     # Checks if the `AwesomePrint` gem is available.
@@ -649,6 +693,53 @@ class EnhancedErrors
     def awesome_print_available?
       return @awesome_print_available unless @awesome_print_available.nil?
       @awesome_print_available = defined?(AwesomePrint)
+    end
+
+    # Safely calls `inspect` on a variable.
+    #
+    # @param variable [Object] The variable to inspect.
+    # @return [String] The inspected variable or a safe fallback.
+    def safe_inspect(variable)
+      variable.inspect
+    rescue => e
+      safe_to_s(variable)
+    end
+
+    # Safely converts a variable to a string, handling exceptions.
+    #
+    # @param variable [Object] The variable to convert.
+    # @return [String] The string representation or a safe fallback.
+    def safe_to_s(variable)
+      str = variable.to_s
+      if str.length > 30
+        str[0...30] + '...'
+      else
+        str
+      end
+    rescue
+      "[Unprintable variable]"
+    end
+
+    # Safely retrieves a local variable from a binding.
+    #
+    # @param binding_context [Binding] The binding context.
+    # @param var_name [Symbol] The name of the local variable.
+    # @return [Object] The value of the local variable or a safe fallback.
+    def safe_local_variable_get(binding_context, var_name)
+      binding_context.local_variable_get(var_name)
+    rescue
+      "[Error accessing local variable #{var_name}]"
+    end
+
+    # Safely retrieves an instance variable from an object.
+    #
+    # @param obj [Object] The object.
+    # @param var_name [Symbol] The name of the instance variable.
+    # @return [Object] The value of the instance variable or a safe fallback.
+    def safe_instance_variable_get(obj, var_name)
+      obj.instance_variable_get(var_name)
+    rescue
+      "[Error accessing instance variable #{var_name}]"
     end
 
     # Default implementation for the on_format hook.

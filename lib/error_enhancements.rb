@@ -1,13 +1,20 @@
+# error_enhancements.rb
+
 module ErrorEnhancements
   def message
-    original_message = super()
-    if original_message.include?(variables_message)
+    original_message = begin
+                         super()
+                       rescue
+                         ''
+                       end
+    vars_message = variables_message rescue ""
+    if original_message.include?(vars_message)
       original_message
     else
-      "#{original_message}\n#{variables_message}"
+      "#{original_message}\n#{vars_message}"
     end
   rescue => e
-    original_message
+    original_message || ''
   end
 
   def variables_message
@@ -18,7 +25,8 @@ module ErrorEnhancements
                              end
                              EnhancedErrors.format(bindings_of_interest)
                            rescue => e
-                             puts "Error in variables_message: #{e.message}"
+                             # Avoid using puts; consider logging instead
+                             # Avoid raising exceptions in rescue blocks
                              ""
                            end
   end
@@ -44,7 +52,7 @@ module ErrorEnhancements
       bindings_of_interest << binding_infos.first if binding_infos.first
     end
 
-    # find the last rescue binding if there is one
+    # Find the last rescue binding if there is one
     binding_infos.reverse.each do |info|
       if info[:capture_event] == 'rescue'
         bindings_of_interest << info
@@ -53,5 +61,4 @@ module ErrorEnhancements
     end
     bindings_of_interest
   end
-
 end

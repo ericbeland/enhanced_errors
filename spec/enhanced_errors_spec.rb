@@ -1,8 +1,15 @@
+# spec/enhanced_errors_spec.rb
+
 require_relative '../lib/enhanced_errors'
 
 RSpec.describe EnhancedErrors do
   before(:each) do
     EnhancedErrors.enhance!
+  end
+
+  # Helper method to strip ANSI color codes from strings
+  def strip_color_codes(str)
+    str.gsub(/\e\[\d+(;\d+)*m/, '')
   end
 
   describe 'Exception enhancement' do
@@ -85,18 +92,18 @@ RSpec.describe EnhancedErrors do
           context 'with Ruby version >= 3.3.0' do
             before { stub_const('RUBY_VERSION', '3.3.0') }
 
-            it 'sets @capture_events to [:raise, :rescue]' do
+            it 'sets @capture_events to Set containing :raise' do
               EnhancedErrors.send(:validate_and_set_capture_events, nil)
-              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise, :rescue])
+              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise]))
             end
           end
 
           context 'with Ruby version < 3.3.0' do
             before { stub_const('RUBY_VERSION', '3.2.0') }
 
-            it 'sets @capture_events to [:raise] only' do
+            it 'sets @capture_events to Set containing :raise only' do
               EnhancedErrors.send(:validate_and_set_capture_events, nil)
-              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise])
+              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise]))
             end
           end
         end
@@ -104,19 +111,19 @@ RSpec.describe EnhancedErrors do
         context 'when capture_events is provided as an array' do
           it 'captures only :raise' do
             EnhancedErrors.send(:validate_and_set_capture_events, [:raise])
-            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise])
+            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise]))
           end
 
           it 'captures only :rescue with Ruby >= 3.3.0' do
             stub_const('RUBY_VERSION', '3.3.0')
             EnhancedErrors.send(:validate_and_set_capture_events, [:rescue])
-            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:rescue])
+            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:rescue]))
           end
 
           it 'captures both :raise and :rescue with Ruby >= 3.3.0' do
             stub_const('RUBY_VERSION', '3.3.0')
             EnhancedErrors.send(:validate_and_set_capture_events, [:raise, :rescue])
-            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise, :rescue])
+            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise, :rescue]))
           end
 
           it 'ignores :rescue with Ruby < 3.3.0 and prints a warning' do
@@ -125,9 +132,8 @@ RSpec.describe EnhancedErrors do
               EnhancedErrors.send(:validate_and_set_capture_events, [:raise, :rescue])
             }.to output(/Warning: :rescue capture_event is not supported/).to_stdout
 
-            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise])
+            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise]))
           end
-
         end
       end
     end
@@ -136,20 +142,20 @@ RSpec.describe EnhancedErrors do
       it 'only appends variables once' do
         EnhancedErrors.enhance!
         expect {
-        @foo = 'bar'
-        begin
-          raise RuntimeError.new('Foo')
-        rescue Exception => e
-          boo = 'baz'
+          @foo = 'bar'
           begin
-            raise e
-          rescue => exception
-            raise exception # RuntimeError.new "Exception: #{exception}"
-            exception.message
+            raise RuntimeError.new('Foo')
+          rescue Exception => e
+            boo = 'baz'
+            begin
+              raise e
+            rescue => exception
+              raise exception
+              exception.message
+            end
           end
-        end
         }.to raise_error(RuntimeError) do |e|
-          expect(e.message).to include("@foo").once
+          expect(e.message.scan('@foo').size).to eq(1)
         end
       end
     end
@@ -176,7 +182,6 @@ RSpec.describe EnhancedErrors do
       end
 
       it 'skips @_ variables in info mode' do
-
         EnhancedErrors.enhance!
         expect {
           @_variable_to_skip = 'should be skipped'
@@ -187,13 +192,13 @@ RSpec.describe EnhancedErrors do
       end
 
       it 'includes @_ variables in debug mode' do
-        @_variable_to_skip = 'should not be skipped'
+        @_variable_to_not_skip = 'should not be skipped'
 
         EnhancedErrors.enhance!(debug: true)
         expect {
           raise 'Test exception'
         }.to raise_error(StandardError) do |e|
-          expect(e.message).to include('@_variable_to_skip')
+          expect(e.message).to include('@_variable_to_not_skip')
         end
       end
     end
@@ -218,6 +223,7 @@ RSpec.describe EnhancedErrors do
       before do
         EnhancedErrors.enhance!
         EnhancedErrors.on_capture = nil
+        EnhancedErrors.on_format = nil
       end
 
       describe 'on_capture hook' do
@@ -243,6 +249,119 @@ RSpec.describe EnhancedErrors do
           locals = captured_binding_infos.first[:variables][:locals]
           expect(locals[:username]).to eq('test_user')
           expect(locals[:password]).to eq('[REDACTED]')
+        end
+
+        it 'handles exceptions raised in the on_capture block' do
+          exception_in_on_capture = RuntimeError.new('Error in on_capture')
+
+          EnhancedErrors.on_capture do |binding_info|
+            raise exception_in_on_capture
+          end
+
+          expect {
+            raise 'Test exception'
+          }.to raise_error(StandardError) do |e|
+            # Ensure the original exception is raised, not the one from on_capture
+            expect(e.message).to include('Test exception')
+            # Ensure that no binding_infos were captured
+            binding_infos = e.instance_variable_get(:@binding_infos)
+            expect(binding_infos).to be_nil.or be_empty
+            # Ensure that the exception from on_capture does not cause a reentrant exception
+            expect {
+              e.message
+            }.not_to raise_error
+          end
+        end
+
+        it 'does not capture data if on_capture raises an exception' do
+          EnhancedErrors.on_capture do |binding_info|
+            raise 'Error in on_capture'
+          end
+
+          expect {
+            raise 'Test exception'
+          }.to raise_error(StandardError) do |e|
+            expect(e.message).to include('Test exception')
+            # Ensure that no binding_infos were captured
+            binding_infos = e.instance_variable_get(:@binding_infos)
+            expect(binding_infos).to be_nil.or be_empty
+          end
+        end
+      end
+
+      describe 'on_format hook' do
+        it 'receives a string in the on_format hook' do
+          received_string = nil
+
+          EnhancedErrors.on_format do |formatted_string|
+            received_string = formatted_string
+            formatted_string
+          end
+
+          EnhancedErrors.format(captured_bindings)
+
+          expect(received_string).to be_a(String)
+          expect(received_string).to_not be_empty
+        end
+
+        it 'replaces the formatted string in the result' do
+          EnhancedErrors.on_format do |formatted_string|
+            '---whatever---'
+          end
+          result = EnhancedErrors.format(captured_bindings)
+          expect(result).to eq('---whatever---')
+        end
+
+        it 'resets on_format to nil and uses the default formatted output' do
+          default_formatted_output = EnhancedErrors.binding_infos_array_to_string(captured_bindings, :terminal)
+
+          EnhancedErrors.on_format do |formatted_string|
+            '---whatever---'
+          end
+          result_with_hook = EnhancedErrors.format(captured_bindings)
+          expect(result_with_hook).to eq('---whatever---')
+
+          EnhancedErrors.on_format = nil
+          result_without_hook = EnhancedErrors.format(captured_bindings)
+          expect(result_without_hook).to eq(default_formatted_output)
+        end
+
+        it 'handles exceptions raised in the on_format block' do
+          EnhancedErrors.on_format do |formatted_string|
+            raise 'Error in on_format'
+          end
+
+          expect {
+            raise 'Test exception'
+          }.to raise_error(StandardError) do |e|
+            # Ensure the original exception message is preserved
+            expect(e.message).to include('Test exception')
+            # Ensure that variables_message is empty
+            expect(e.variables_message).to eq('')
+            # Ensure that the exception from on_format does not cause a reentrant exception
+            expect {
+              e.message
+            }.not_to raise_error
+          end
+        end
+
+        it 'does not display data if on_format raises an exception' do
+          EnhancedErrors.on_format do |formatted_string|
+            raise 'Error in on_format'
+          end
+
+          expect {
+            local_var = 'test_value'
+            raise 'Test exception'
+          }.to raise_error(StandardError) do |e|
+            expect(e.message).to include('Test exception')
+            # The variables_message should be empty
+            expect(e.variables_message).to eq('')
+            # Ensure that the exception from on_format does not cause a reentrant exception
+            expect {
+              e.message
+            }.not_to raise_error
+          end
         end
       end
 
@@ -293,10 +412,29 @@ RSpec.describe EnhancedErrors do
           expect(captured_binding_infos.first[:capture_event]).to eq('raise')
         end
 
-        it 'has capture_event set to "rescue" when an exception is rescued' do
+        it 'does not capture "rescue" events by default' do
+          captured_binding_infos = []
+          EnhancedErrors.on_capture do |binding_info|
+            captured_binding_infos << binding_info
+            binding_info
+          end
+
+          begin
+            raise 'Test exception'
+          rescue
+            # Exception is rescued here
+          end
+
+          rescue_info = captured_binding_infos.find { |info| info[:capture_event] == 'rescue' }
+          expect(rescue_info).to be_nil
+        end
+
+        it 'captures "rescue" events when capture_rescue is true' do
           if Gem::Version.new(RUBY_VERSION) < Gem::Version.new('3.3.0')
             skip 'Ruby version does not support :rescue event in TracePoint'
           end
+
+          EnhancedErrors.enhance!(capture_rescue: true)
 
           captured_binding_infos = []
           EnhancedErrors.on_capture do |binding_info|
@@ -500,50 +638,6 @@ RSpec.describe EnhancedErrors do
       end
     end
 
-    describe '.on_format' do
-      let(:default_formatted_output) do
-        EnhancedErrors.binding_infos_array_to_string(captured_bindings, :terminal)
-      end
-
-      after do
-        EnhancedErrors.on_format = nil
-      end
-
-      it 'receives a string in the on_format hook' do
-        received_string = nil
-
-        EnhancedErrors.on_format do |formatted_string|
-          received_string = formatted_string
-          formatted_string
-        end
-
-        EnhancedErrors.format(captured_bindings)
-
-        expect(received_string).to be_a(String)
-        expect(received_string).to_not be_empty
-      end
-
-      it 'replaces the formatted string in the result' do
-        EnhancedErrors.on_format do |formatted_string|
-          '---whatever---'
-        end
-        result = EnhancedErrors.format(captured_bindings)
-        expect(result).to eq('---whatever---')
-      end
-
-      it 'resets on_format to nil and uses the default formatted output' do
-        EnhancedErrors.on_format do |formatted_string|
-          '---whatever---'
-        end
-        result_with_hook = EnhancedErrors.format(captured_bindings)
-        expect(result_with_hook).to eq('---whatever---')
-
-        EnhancedErrors.on_format = nil
-        result_without_hook = EnhancedErrors.format(captured_bindings)
-        expect(result_without_hook).to eq(default_formatted_output)
-      end
-    end
-
     context 'global variables' do
       before(:each) do
         EnhancedErrors.enhance!(debug: false)
@@ -564,6 +658,105 @@ RSpec.describe EnhancedErrors do
         ensure
           $variable_to_skip = nil
           $variable_to_include = nil
+        end
+      end
+    end
+
+    describe 'Edge cases with unusual exceptions and objects' do
+      context 'exceptions raised in BasicObject instances' do
+        it 'handles exceptions raised in BasicObject instances without methods' do
+          basic_object_class = Class.new(BasicObject) do
+            def raise_exception
+              ::Kernel.raise 'Error from BasicObject'
+            end
+          end
+
+          obj = basic_object_class.new
+
+          expect {
+            obj.raise_exception
+          }.to raise_error(RuntimeError, 'Error from BasicObject') do |e|
+            expect(e.message).to include('Error from BasicObject')
+            expect(e.instance_variable_get(:@binding_infos)).not_to be_nil
+            # Ensure no errors occur in the error handling code when dealing with BasicObject instances
+          end
+        end
+      end
+
+      context 'exceptions that do not inherit from StandardError' do
+        it 'handles exceptions that do not inherit from StandardError' do
+          class CustomException < Exception
+            def initialize(msg='Custom exception')
+              super(msg)
+            end
+          end
+
+          expect {
+            raise CustomException.new('Non-StandardError exception')
+          }.to raise_error(CustomException) do |e|
+            expect(e.message).to include('Non-StandardError exception')
+            expect(e.instance_variable_get(:@binding_infos)).not_to be_nil
+          end
+        end
+      end
+
+      context 'exceptions with faulty message methods' do
+        it 'handles exceptions where message method raises an exception' do
+          class FaultyMessageException < StandardError
+            def message
+              raise 'Exception in message method'
+            end
+          end
+
+          expect {
+            raise FaultyMessageException.new
+          }.to raise_error(FaultyMessageException) do |e|
+            # Ensure that the error handling code does not cause a re-entrant exception
+            expect {
+              e.message
+            }.not_to raise_error
+            # The message should include the variables message
+            message_without_colors = strip_color_codes(e.message)
+            expect(message_without_colors).to include('Instances:')
+            # Additionally, check that the original exception is preserved
+            expect(e.instance_variable_get(:@binding_infos)).not_to be_nil
+          end
+        end
+      end
+
+      context 'variables that raise exceptions when inspected' do
+        it 'handles variables that raise exceptions when inspected' do
+          class UninspectableObject
+            def inspect
+              raise 'Exception in inspect method'
+            end
+
+            def to_s
+              raise 'Exception in to_s method'
+            end
+          end
+
+          uninspectable_variable = UninspectableObject.new
+
+          expect {
+            begin
+              local_variable = uninspectable_variable
+              raise 'Test exception with uninspectable variable'
+            rescue => e
+              # Simulate variable in the binding that raises exception when inspected
+              raise e
+            end
+          }.to raise_error(RuntimeError, /Test exception with uninspectable variable/) do |e|
+            # Ensure that the error handling code does not cause a re-entrant exception
+            expect(e.instance_variable_get(:@binding_infos)).not_to be_nil
+            # Strip color codes from the message
+            message_without_colors = strip_color_codes(e.message)
+            # Check that the error handling code safely handled the variable that raises
+            # exceptions when inspected
+            expect(message_without_colors).to include('Test exception with uninspectable variable')
+            # The variable description should handle the exception and possibly show a placeholder
+            expect(message_without_colors).to match(/local_variable: \[Unprintable variable\]/)
+          end
         end
       end
     end
