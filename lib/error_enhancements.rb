@@ -19,46 +19,41 @@ module ErrorEnhancements
 
   def variables_message
     @variables_message ||= begin
-                             bindings_of_interest = []
-                             if defined?(@binding_infos) && @binding_infos && !@binding_infos.empty?
+                             if @binding_infos&.any?
                                bindings_of_interest = select_binding_infos(@binding_infos)
+                               EnhancedErrors.format(bindings_of_interest)
+                             else
+                               ''
                              end
-                             EnhancedErrors.format(bindings_of_interest)
-                           rescue => e
-                             # Avoid using puts; consider logging instead
-                             # Avoid raising exceptions in rescue blocks
-                             ""
+                           rescue
+                             ''
                            end
   end
 
   private
 
-  def select_binding_infos(binding_infos)
-    # Preference:
-    # Grab the first raise binding that isn't a library (gem) binding.
-    # If there are only library bindings, grab the first one.
-    # Grab the last rescue binding if we have one
+    def select_binding_infos(binding_infos)
+      # Preference:
+      # 1. First 'raise' binding that isn't from a library (gem).
+      # 2. If none, the first binding.
+      # 3. The last 'rescue' binding if available.
 
-    bindings_of_interest = []
+      bindings_of_interest = []
 
-    binding_infos.each do |info|
-      if info[:capture_event] == 'raise' && !info[:library]
-        bindings_of_interest << info
-        break
+      first_app_raise = binding_infos.find do |info|
+        info[:capture_event] == 'raise' && !info[:library]
       end
-    end
+      bindings_of_interest << first_app_raise if first_app_raise
 
-    if bindings_of_interest.empty?
-      bindings_of_interest << binding_infos.first if binding_infos.first
-    end
-
-    # Find the last rescue binding if there is one
-    binding_infos.reverse.each do |info|
-      if info[:capture_event] == 'rescue'
-        bindings_of_interest << info
-        break
+      if bindings_of_interest.empty? && binding_infos.first
+        bindings_of_interest << binding_infos.first
       end
+
+      last_rescue = binding_infos.reverse.find do |info|
+        info[:capture_event] == 'rescue'
+      end
+      bindings_of_interest << last_rescue if last_rescue
+
+      bindings_of_interest
     end
-    bindings_of_interest
-  end
 end

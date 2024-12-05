@@ -93,6 +93,7 @@ RSpec.describe EnhancedErrors do
             before { stub_const('RUBY_VERSION', '3.3.0') }
 
             it 'sets @capture_events to Set containing :raise' do
+              EnhancedErrors.capture_rescue = false
               EnhancedErrors.send(:validate_and_set_capture_events, nil)
               expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise]))
             end
@@ -145,7 +146,7 @@ RSpec.describe EnhancedErrors do
           @foo = 'bar'
           begin
             raise RuntimeError.new('Foo')
-          rescue Exception => e
+          rescue => e
             boo = 'baz'
             begin
               raise e
@@ -497,11 +498,12 @@ RSpec.describe EnhancedErrors do
     end
 
     it 'captures binding information when exceptions are rescued and re-raised' do
+      EnhancedErrors.enhance!
       def method_with_rescue
         begin
           raise 'Initial exception'
-        rescue
-          raise
+        rescue => e
+          raise e
         end
       end
 
@@ -509,7 +511,13 @@ RSpec.describe EnhancedErrors do
         method_with_rescue
       }.to raise_error(StandardError) do |e|
         binding_infos = e.instance_variable_get(:@binding_infos)
-        expect(binding_infos.size).to be >= 2
+
+        if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3.0')
+          expect(binding_infos.size).to be >= 2
+        else
+          expect(binding_infos.size).to be >= 1
+        end
+
 
         first_binding_info = binding_infos.first
         last_binding_info = binding_infos.last
@@ -520,34 +528,73 @@ RSpec.describe EnhancedErrors do
     end
 
     context 'TracePoint management' do
-      it 'manages TracePoint correctly when start_tracing is called multiple times' do
-        first_trace = EnhancedErrors.trace
-        EnhancedErrors.enhance!
-        second_trace = EnhancedErrors.trace
-
-        expect(first_trace).to eq(second_trace)
-        expect(EnhancedErrors.trace.enabled?).to be true
-
+      before(:each) do
+        # Ensure EnhancedErrors is disabled before each test
         EnhancedErrors.enhance!(enabled: false)
-        expect(EnhancedErrors.trace.enabled?).to be false
+        # Reset traces to ensure a clean state
+        EnhancedErrors.traces = nil
+      end
+
+      it 'manages TracePoint correctly when enhance! is called multiple times' do
+        # After disabling, @traces should be nil
+        expect(EnhancedErrors.traces).to be_nil
+
+        # Call enhance! to enable tracing
+        EnhancedErrors.enhance!
+        first_trace = EnhancedErrors.traces[Thread.current]
+        expect(first_trace).not_to be_nil
+        expect(first_trace.enabled?).to be true
+
+        # Call enhance! again to ensure idempotency
+        EnhancedErrors.enhance!
+        second_trace = EnhancedErrors.traces[Thread.current]
+
+        # The TracePoint object should be the same
+        expect(first_trace).to eq(second_trace)
+        expect(second_trace.enabled?).to be true
+
+        # Disable EnhancedErrors
+        EnhancedErrors.enhance!(enabled: false)
+        disabled_trace = EnhancedErrors.traces[Thread.current]
+        expect(disabled_trace).not_to be_nil
+        expect(disabled_trace.enabled?).to be false
       end
 
       it 'remains disabled after being disabled until explicitly re-enabled' do
+        # Ensure EnhancedErrors is disabled
         EnhancedErrors.enhance!(enabled: false)
+        EnhancedErrors.traces = nil
         expect(EnhancedErrors.enabled).to be false
 
+        # Ensure the TracePoint for the current thread is nil
+        trace = EnhancedErrors.traces && EnhancedErrors.traces[Thread.current]
+        expect(trace).to be_nil
+
+        # Raise an exception and ensure @binding_infos is not set
         expect {
           raise 'Test exception while disabled'
         }.to raise_error(StandardError) do |e|
           expect(e.instance_variable_get(:@binding_infos)).to be_nil
         end
 
-        expect(EnhancedErrors.enabled).to be false
-
+        # Re-enable EnhancedErrors
         EnhancedErrors.enhance!(enabled: true)
         expect(EnhancedErrors.enabled).to be true
+
+        # Ensure TracePoint is enabled
+        trace = EnhancedErrors.traces[Thread.current]
+        expect(trace).not_to be_nil
+        expect(trace.enabled?).to be true
+
+        # Raise an exception and ensure @binding_infos is set
+        expect {
+          raise 'Test exception while enabled'
+        }.to raise_error(StandardError) do |e|
+          expect(e.instance_variable_get(:@binding_infos)).not_to be_nil
+        end
       end
     end
+
 
     context 'colorization based on format' do
       it 'enables and disables colorization in Colors based on format' do

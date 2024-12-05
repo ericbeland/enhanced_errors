@@ -7,18 +7,27 @@ require_relative 'colors'
 require_relative 'error_enhancements'
 require_relative 'binding'
 
-# While we could just catch StandardError, we would miss a number of things.
-IGNORED_EXCEPTIONS = [
-  SystemExit,
-  NoMemoryError,
-  SignalException,
-  Interrupt,
-  ScriptError,
-  LoadError,
-  NotImplementedError,
-  SyntaxError,
-  SystemStackError
-]
+# Exception class names to ignore. Using strings to avoid uninitialized constant errors.
+IGNORED_EXCEPTION_NAMES = %w[SystemExit NoMemoryError SignalException Interrupt
+                             ScriptError LoadError NotImplementedError SyntaxError
+                             SystemStackError Psych::BadAlias]
+
+# Helper method to safely resolve class names to constants
+def resolve_exception_class(name)
+  names = name.split('::')
+  names.inject(Object) do |mod, name_part|
+    if mod.const_defined?(name_part, false)
+      mod.const_get(name_part)
+    else
+      return nil
+    end
+  end
+rescue NameError
+  nil
+end
+
+# Attempt to resolve the exception classes, ignoring any that are not defined
+IGNORED_EXCEPTIONS = IGNORED_EXCEPTION_NAMES.map { |name| resolve_exception_class(name) }.compact
 
 # The EnhancedErrors class provides mechanisms to enhance exception handling by capturing
 # additional context such as binding information, variables, and method arguments when exceptions are raised.
@@ -30,10 +39,10 @@ class EnhancedErrors
     # @return [Boolean]
     attr_accessor :enabled
 
-    # The TracePoint object used for tracing exceptions.
+    # The TracePoint objects used for tracing exceptions per thread.
     #
-    # @return [TracePoint, nil]
-    attr_accessor :trace
+    # @return [Hash{Thread => TracePoint}]
+    attr_accessor :traces
 
     # The configuration block provided during enhancement.
     #
@@ -192,7 +201,8 @@ class EnhancedErrors
       if enabled == false
         @original_global_variables = nil
         @enabled = false
-        @trace.disable if @trace
+        # Disable TracePoints in all threads
+        @traces.each_value { |trace| trace.disable } if @traces
       else
         @enabled = true
         @debug = debug
@@ -213,7 +223,20 @@ class EnhancedErrors
         instance_eval(&@config_block) if @config_block
 
         validate_and_set_capture_events(capture_events)
-        start_tracing
+
+        # Initialize @traces hash to keep track of TracePoints per thread
+        @traces ||= {}
+        # Set up TracePoint in the main thread
+        start_tracing(Thread.current)
+
+        # Set up TracePoint in all existing threads
+        Thread.list.each do |thread|
+          next if thread == Thread.current
+          start_tracing(thread)
+        end
+
+        # Hook into Thread creation to set up TracePoint in new threads
+        override_thread_new
       end
     end
 
@@ -296,20 +319,10 @@ class EnhancedErrors
     # @param format [Symbol] The format to use (:json, :plaintext, :terminal).
     # @return [String] The formatted string representation of the binding information.
     def binding_infos_array_to_string(captured_bindings, format = :terminal)
-      case format
-      when :json
-        Colors.enabled = false
-        JSON.pretty_generate(captured_bindings)
-      when :plaintext
-        Colors.enabled = false
-        captured_bindings.map { |binding_info| binding_info_string(binding_info) }.join("\n")
-      when :terminal
-        Colors.enabled = true
-        captured_bindings.map { |binding_info| binding_info_string(binding_info) }.join("\n")
-      else
-        Colors.enabled = false
-        captured_bindings.map { |binding_info| binding_info_string(binding_info) }.join("\n")
-      end
+      Colors.enabled = format == :terminal
+      formatted_bindings = captured_bindings.map { |binding_info| binding_info_string(binding_info) }
+
+      format == :json ? JSON.pretty_generate(captured_bindings) : formatted_bindings.join("\n")
     end
 
     # Determines the default output format based on the current environment.
@@ -418,14 +431,15 @@ class EnhancedErrors
 
     private
 
-    # Starts the TracePoint for capturing exceptions based on configured events.
+    # Starts the TracePoint for capturing exceptions based on configured events in a specific thread.
     #
+    # @param thread [Thread] The thread to start tracing in.
     # @return [void]
-    def start_tracing
-      return if @trace && @trace.enabled?
+    def start_tracing(thread)
+      return if @traces[thread]&.enabled?
       events = @capture_events ? @capture_events.to_a : default_capture_events
-      @trace = TracePoint.new(*events) do |tp|
-        next if Thread.current[:enhanced_errors_processing] || ignored_exception?(tp.raised_exception)
+      trace = TracePoint.new(*events) do |tp|
+        next if Thread.current[:enhanced_errors_processing] || Thread.current[:on_capture] || ignored_exception?(tp.raised_exception)
         Thread.current[:enhanced_errors_processing] = true
         exception = tp.raised_exception
         capture_me = !exception.frozen? && EnhancedErrors.eligible_for_capture.call(exception)
@@ -499,11 +513,14 @@ class EnhancedErrors
 
         if on_capture_hook
           begin
+            Thread.current[:on_capture] = true
             binding_info = on_capture_hook.call(binding_info)
           rescue => e
             # Since the on_capture_hook failed, do not capture this binding_info
             binding_info = nil
             # Optionally, log the error safely if logging is guaranteed not to raise exceptions
+          ensure
+            Thread.current[:on_capture] = false
           end
         end
 
@@ -520,7 +537,36 @@ class EnhancedErrors
         Thread.current[:enhanced_errors_processing] = false
       end
 
-      @trace.enable
+      @traces[thread] = trace
+      trace.enable
+    end
+
+    # Overrides Thread.new and Thread.start to ensure TracePoint is enabled in new threads.
+    #
+    # @return [void]
+    def override_thread_new
+      return if @thread_overridden
+      @thread_overridden = true
+
+      class << Thread
+        alias_method :original_new, :new
+
+        def new(*args, &block)
+          original_new(*args) do |*block_args|
+            EnhancedErrors.send(:start_tracing, Thread.current)
+            block.call(*block_args)
+          end
+        end
+
+        alias_method :original_start, :start
+
+        def start(*args, &block)
+          original_start(*args) do |*block_args|
+            EnhancedErrors.send(:start_tracing, Thread.current)
+            block.call(*block_args)
+          end
+        end
+      end
     end
 
     # Checks if the exception is in the ignored exceptions list.
@@ -711,8 +757,8 @@ class EnhancedErrors
     # @return [String] The string representation or a safe fallback.
     def safe_to_s(variable)
       str = variable.to_s
-      if str.length > 30
-        str[0...30] + '...'
+      if str.length > 120
+        str[0...120] + '...'
       else
         str
       end
