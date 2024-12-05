@@ -384,7 +384,9 @@ Ruby's TracePoint binding capture very narrowly with no other C API or dependenc
 
 - **TBD**: Memory considerations. This does capture data when an exception happens. EnhancedErrors hides under the bed when it sees **NoMemoryError**.
 
-- **Goal: Production Safety**: The gem is designed to, once vetted, be safe for production use, giving you valuable insights without compromising performance. I suggest letting it get well-vetted before making the leap and testing it for both performance and memory under load internally, as well.
+- **Goal: Production Safety**: The gem is designed to, once vetted, be safe for production use, giving you valuable insights without compromising performance.
+I suggest letting it get well-vetted before making the leap and testing it for both performance and memory under load internally, as well.
+I would not enable it in production *yet*.
 
 ## Contributing
 
