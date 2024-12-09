@@ -1,5 +1,5 @@
 require 'benchmark'
-require_relative '../lib/enhanced_errors' # Adjust the path if necessary
+require_relative '../lib/enhanced/enhanced' # Adjust the path if necessary
 
 # Define the number of iterations
 ITERATIONS = 10_000
@@ -13,7 +13,7 @@ def calculate_cost(time_in_seconds)
 end
 
 def with_enhanced_errors
-  EnhancedErrors.enhance!(debug: false)
+  EnhancedErrors.enhance_exceptions!(debug: false)
   ITERATIONS.times do
     begin
       foo = 'bar'
@@ -38,7 +38,7 @@ def without_enhanced_errors
 end
 
 def when_capture_only_regexp_matched
-  EnhancedErrors.enhance!(debug: false) do
+  EnhancedErrors.enhance_exceptions!(debug: false) do
     eligible_for_capture { |exception| !!/Boo/.match(exception.class.to_s) }
   end
 
@@ -54,7 +54,7 @@ def when_capture_only_regexp_matched
 end
 
 def when_capture_only_regexp_did_not_match
-  EnhancedErrors.enhance!(debug: false) do
+  EnhancedErrors.enhance_exceptions!(debug: false) do
     eligible_for_capture { |exception| !!/Baz/.match(exception.class.to_s) }
   end
 

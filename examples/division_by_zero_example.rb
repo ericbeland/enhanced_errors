@@ -1,7 +1,7 @@
 require './lib/enhanced_errors'
 require 'awesome_print' # Optional, for better output
 
-EnhancedErrors.enhance!
+EnhancedErrors.enhance_exceptions!(override_messages: true, capture_events: [:raise, :rescue])
 
 def foo
   begin
@@ -20,7 +20,7 @@ end
 def boo
     seeme = 'youshould'
     baz
-  rescue => e
+rescue Exception => e
     puts e.message
 end
 

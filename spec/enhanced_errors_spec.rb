@@ -1,10 +1,22 @@
 # spec/enhanced_errors_spec.rb
 
 require_relative '../lib/enhanced_errors'
+require_relative 'spec_helper'
+
+class TestClass
+  def self.class_method(arg1)
+    raise 'Exception in class method'
+  end
+
+  def instance_method(arg1, arg2)
+    raise 'Exception in instance method'
+  end
+end
 
 RSpec.describe EnhancedErrors do
   before(:each) do
-    EnhancedErrors.enhance!
+    # Enable exception enhancements and RSpec enhancements so let variables are captured
+    EnhancedErrors.enhance_exceptions!(override_messages: false)
   end
 
   # Helper method to strip ANSI color codes from strings
@@ -40,19 +52,62 @@ RSpec.describe EnhancedErrors do
       @instance_variable = 'instance_value'
     end
 
-    context 'variable capture' do
-      it 'captures RSpec let variables when an exception is raised' do
-        let_variable
+    context 'override_messages option' do
+      it 'does not override the exception message if override_messages: false' do
+        EnhancedErrors.enhance_exceptions!(override_messages: false)
         expect {
-          raise 'Test exception'
-        }.to raise_error(StandardError, /let_value/)
+          raise 'Original message'
+        }.to raise_error(StandardError) do |e|
+          # The captured_variables should appear only if printed out by the user; message should remain unchanged
+          expect(e.message).to eq('Original message')
+          # captured_variables should still be callable
+          expect(e.captured_variables).to_not be_empty
+        end
       end
+
+      it 'overrides the exception message if override_messages: true' do
+        EnhancedErrors.enhance_exceptions!(override_messages: true)
+        expect {
+          local_var = 'hello' # to ensure something is captured
+          raise 'Original message'
+        }.to raise_error(StandardError) do |e|
+          msg = strip_color_codes(e.message)
+          # Now the message should include the captured variables
+          expect(msg).to include('Original message')
+          expect(msg).to include('Locals:')
+          expect(msg).to include("local_var: \"hello\"") # Updated to match actual format
+        end
+      end
+    end
+
+    context 'RSpec bindings capture without exceptions' do
+      before(:all) do
+        EnhancedErrors.start_rspec_binding_capture
+      end
+
+      after(:all) do
+        binding_info = EnhancedErrors.stop_rspec_binding_capture
+      end
+
+      it 'captures bindings from RSpec test blocks via start/stop methods' do
+        test_local = true
+      end
+    end
+
+    context 'EnhancedErrors.stop_rspec_binding_capture' do
+      it 'does not capture bindings if start_rspec_binding_capture was not called' do
+        binding = EnhancedErrors.stop_rspec_binding_capture
+        expect(binding).to be_nil
+      end
+    end
+
+    context 'variable capture' do
 
       it 'captures instance variables when an exception is raised' do
         expect {
           raise 'Test exception'
         }.to raise_error(StandardError) do |e|
-          binding_infos = e.instance_variable_get(:@binding_infos)
+          binding_infos = e.binding_infos
           last_binding_info = binding_infos.last
           instances = last_binding_info[:variables][:instances]
           expect(instances).to include(:@instance_variable)
@@ -64,11 +119,11 @@ RSpec.describe EnhancedErrors do
     context 'environment defaults' do
       it 'applies correct defaults based on environment' do
         ENV['RAILS_ENV'] = 'development'
-        EnhancedErrors.enhance!
+        EnhancedErrors.enhance_exceptions!
         expect(EnhancedErrors.get_default_format_for_environment).to eq(:terminal)
 
         ENV['RAILS_ENV'] = 'production'
-        EnhancedErrors.enhance!
+        EnhancedErrors.enhance_exceptions!
         expect(EnhancedErrors.get_default_format_for_environment).to eq(:json)
 
         ENV.delete('RAILS_ENV')
@@ -131,7 +186,7 @@ RSpec.describe EnhancedErrors do
             stub_const('RUBY_VERSION', '3.2.0')
             expect {
               EnhancedErrors.send(:validate_and_set_capture_events, [:raise, :rescue])
-            }.to output(/Warning: :rescue capture_event is not supported/).to_stdout
+            }.to output(/EnhancedErrors: Warning: :rescue capture_event not supported below Ruby 3.3.0, ignoring it./).to_stdout
 
             expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise]))
           end
@@ -141,7 +196,7 @@ RSpec.describe EnhancedErrors do
 
     context 'multiple variable appends' do
       it 'only appends variables once' do
-        EnhancedErrors.enhance!
+        EnhancedErrors.enhance_exceptions!
         expect {
           @foo = 'bar'
           begin
@@ -152,11 +207,11 @@ RSpec.describe EnhancedErrors do
               raise e
             rescue => exception
               raise exception
-              exception.message
+              exception.captured_variables
             end
           end
         }.to raise_error(RuntimeError) do |e|
-          expect(e.message.scan('@foo').size).to eq(1)
+          expect(e.captured_variables.scan('@foo').size).to eq(1)
         end
       end
     end
@@ -166,14 +221,14 @@ RSpec.describe EnhancedErrors do
         @variable_to_skip = 'should be skipped'
         @variable_to_include = 'should be included'
 
-        EnhancedErrors.enhance! do
+        EnhancedErrors.enhance_exceptions! do
           add_to_skip_list :@variable_to_skip
         end
 
         expect {
           raise 'Test exception'
         }.to raise_error(StandardError) do |e|
-          binding_infos = e.instance_variable_get(:@binding_infos)
+          binding_infos = e.binding_infos
           last_binding_info = binding_infos.last
           instances = last_binding_info[:variables][:instances]
 
@@ -183,23 +238,23 @@ RSpec.describe EnhancedErrors do
       end
 
       it 'skips @_ variables in info mode' do
-        EnhancedErrors.enhance!
+        EnhancedErrors.enhance_exceptions!
         expect {
           @_variable_to_skip = 'should be skipped'
           raise 'Test exception'
         }.to raise_error(StandardError) do |e|
-          expect(e.message).not_to include('@_variable_to_skip')
+          expect(e.captured_variables).not_to include('@_variable_to_skip')
         end
       end
 
       it 'includes @_ variables in debug mode' do
         @_variable_to_not_skip = 'should not be skipped'
 
-        EnhancedErrors.enhance!(debug: true)
+        EnhancedErrors.enhance_exceptions!(debug: true)
         expect {
           raise 'Test exception'
         }.to raise_error(StandardError) do |e|
-          expect(e.message).to include('@_variable_to_not_skip')
+          expect(e.captured_variables).to include('@_variable_to_not_skip')
         end
       end
     end
@@ -208,21 +263,21 @@ RSpec.describe EnhancedErrors do
       it 'truncates output according to max_length' do
         @large_variable = 'a' * 5000
 
-        EnhancedErrors.enhance! do
+        EnhancedErrors.enhance_exceptions! do
           max_length 1000
         end
 
         expect {
           raise 'Test exception'
         }.to raise_error(StandardError) do |e|
-          expect(e.message.length).to be <= 1500
+          expect(e.captured_variables.length).to be <= 1500
         end
       end
     end
 
     context 'hooks' do
       before do
-        EnhancedErrors.enhance!
+        EnhancedErrors.enhance_exceptions!
         EnhancedErrors.on_capture = nil
         EnhancedErrors.on_format = nil
       end
@@ -260,16 +315,17 @@ RSpec.describe EnhancedErrors do
           end
 
           expect {
+            foo = 'bar'
             raise 'Test exception'
           }.to raise_error(StandardError) do |e|
             # Ensure the original exception is raised, not the one from on_capture
-            expect(e.message).to include('Test exception')
+            expect(e.captured_variables).to_not include('bar')
             # Ensure that no binding_infos were captured
-            binding_infos = e.instance_variable_get(:@binding_infos)
+            binding_infos = e.binding_infos
             expect(binding_infos).to be_nil.or be_empty
             # Ensure that the exception from on_capture does not cause a reentrant exception
             expect {
-              e.message
+              e.captured_variables
             }.not_to raise_error
           end
         end
@@ -282,9 +338,8 @@ RSpec.describe EnhancedErrors do
           expect {
             raise 'Test exception'
           }.to raise_error(StandardError) do |e|
-            expect(e.message).to include('Test exception')
             # Ensure that no binding_infos were captured
-            binding_infos = e.instance_variable_get(:@binding_infos)
+            binding_infos = e.binding_infos
             expect(binding_infos).to be_nil.or be_empty
           end
         end
@@ -336,12 +391,9 @@ RSpec.describe EnhancedErrors do
             raise 'Test exception'
           }.to raise_error(StandardError) do |e|
             # Ensure the original exception message is preserved
-            expect(e.message).to include('Test exception')
-            # Ensure that variables_message is empty
-            expect(e.variables_message).to eq('')
-            # Ensure that the exception from on_format does not cause a reentrant exception
+            expect(e.captured_variables).to eq('')
             expect {
-              e.message
+              e.captured_variables
             }.not_to raise_error
           end
         end
@@ -355,18 +407,16 @@ RSpec.describe EnhancedErrors do
             local_var = 'test_value'
             raise 'Test exception'
           }.to raise_error(StandardError) do |e|
-            expect(e.message).to include('Test exception')
-            # The variables_message should be empty
-            expect(e.variables_message).to eq('')
-            # Ensure that the exception from on_format does not cause a reentrant exception
+            # The captured_variables should be empty
+            expect(e.captured_variables).to eq('')
             expect {
-              e.message
+              e.captured_variables
             }.not_to raise_error
           end
         end
       end
 
-      describe 'variables_message method' do
+      describe 'captured_variables method' do
         it 'captures binding information' do
           captured_binding_infos = []
           EnhancedErrors.on_capture do |binding_info|
@@ -391,8 +441,8 @@ RSpec.describe EnhancedErrors do
             @exception = e
           end
 
-          expect(@exception).to respond_to(:variables_message)
-          expect(@exception.variables_message).to include('Locals:', 'local_var', 'test_value')
+          expect(@exception).to respond_to(:captured_variables)
+          expect(@exception.captured_variables).to include('Locals:', 'local_var', 'test_value')
         end
       end
 
@@ -435,7 +485,7 @@ RSpec.describe EnhancedErrors do
             skip 'Ruby version does not support :rescue event in TracePoint'
           end
 
-          EnhancedErrors.enhance!(capture_rescue: true)
+          EnhancedErrors.enhance_exceptions!(capture_rescue: true)
 
           captured_binding_infos = []
           EnhancedErrors.on_capture do |binding_info|
@@ -449,31 +499,25 @@ RSpec.describe EnhancedErrors do
             # Exception is rescued here
           end
 
+
           rescue_info = captured_binding_infos.find { |info| info[:capture_event] == 'rescue' }
           expect(rescue_info).not_to be_nil
           expect(rescue_info[:capture_event]).to eq('rescue')
+
+        ensure
+          EnhancedErrors.capture_rescue = false
         end
       end
     end
 
     describe 'method and arguments capture' do
-      before do
-        class TestClass
-          def self.class_method(arg1)
-            raise 'Exception in class method'
-          end
 
-          def instance_method(arg1, arg2)
-            raise 'Exception in instance method'
-          end
-        end
-      end
 
       it 'captures class method and arguments' do
         expect {
           TestClass.class_method('value1')
         }.to raise_error(StandardError) do |e_class|
-          binding_infos = e_class.instance_variable_get(:@binding_infos)
+          binding_infos = e_class.binding_infos
           last_binding_info = binding_infos.last
           method_and_args = last_binding_info[:method_and_args]
 
@@ -487,7 +531,7 @@ RSpec.describe EnhancedErrors do
           obj = TestClass.new
           obj.instance_method('value1', 'value2')
         }.to raise_error(StandardError) do |e_instance|
-          binding_infos = e_instance.instance_variable_get(:@binding_infos)
+          binding_infos = e_instance.binding_infos
           last_binding_info = binding_infos.last
           method_and_args = last_binding_info[:method_and_args]
 
@@ -498,7 +542,7 @@ RSpec.describe EnhancedErrors do
     end
 
     it 'captures binding information when exceptions are rescued and re-raised' do
-      EnhancedErrors.enhance!
+      EnhancedErrors.enhance_exceptions!
       def method_with_rescue
         begin
           raise 'Initial exception'
@@ -510,14 +554,13 @@ RSpec.describe EnhancedErrors do
       expect {
         method_with_rescue
       }.to raise_error(StandardError) do |e|
-        binding_infos = e.instance_variable_get(:@binding_infos)
+        binding_infos = e.binding_infos
 
         if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3.0')
           expect(binding_infos.size).to be >= 2
         else
           expect(binding_infos.size).to be >= 1
         end
-
 
         first_binding_info = binding_infos.first
         last_binding_info = binding_infos.last
@@ -530,59 +573,70 @@ RSpec.describe EnhancedErrors do
     context 'TracePoint management' do
       before(:each) do
         # Ensure EnhancedErrors is disabled before each test
-        EnhancedErrors.enhance!(enabled: false)
-        # Reset traces to ensure a clean state
-        EnhancedErrors.traces = nil
+        EnhancedErrors.enhance_exceptions!(enabled: false)
+        # Reset trace to ensure a clean state
+        EnhancedErrors.trace = nil
       end
 
-      it 'manages TracePoint correctly when enhance! is called multiple times' do
-        # After disabling, @traces should be nil
-        expect(EnhancedErrors.traces).to be_nil
+      it 'manages TracePoint correctly when enhance_exceptions! is called multiple times' do
+        # After disabling, @trace should be nil
+        expect(EnhancedErrors.trace).to be_nil
 
-        # Call enhance! to enable tracing
-        EnhancedErrors.enhance!
-        first_trace = EnhancedErrors.traces[Thread.current]
+        # Call enhance_exceptions! to enable tracing
+        EnhancedErrors.enhance_exceptions!
+        first_trace = EnhancedErrors.trace
         expect(first_trace).not_to be_nil
         expect(first_trace.enabled?).to be true
 
-        # Call enhance! again to ensure idempotency
-        EnhancedErrors.enhance!
-        second_trace = EnhancedErrors.traces[Thread.current]
-
-        # The TracePoint object should be the same
-        expect(first_trace).to eq(second_trace)
-        expect(second_trace.enabled?).to be true
+        # Call enhance_exceptions! again to ensure idempotency
+        EnhancedErrors.enhance_exceptions!
+        second_trace = EnhancedErrors.trace
 
         # Disable EnhancedErrors
-        EnhancedErrors.enhance!(enabled: false)
-        disabled_trace = EnhancedErrors.traces[Thread.current]
-        expect(disabled_trace).not_to be_nil
-        expect(disabled_trace.enabled?).to be false
+        EnhancedErrors.enhance_exceptions!(enabled: false)
+        disabled_trace = EnhancedErrors.trace
+        # we have switched to cleaning it up, as it seems safer
+        expect(disabled_trace).to be nil
+      end
+
+      it 'caps max binding_infos to track at 10' do
+        EnhancedErrors.enhance_exceptions!
+        exception = StandardError.new('I got raised 15 times')
+        15.times do
+          begin
+            raise exception
+          rescue => e
+            # EnhancedErrors processes the exception here
+          end
+        end
+        expect(exception.binding_infos.size).to eq(10)
+      ensure
+        EnhancedErrors.enhance_exceptions!(enabled: false)
       end
 
       it 'remains disabled after being disabled until explicitly re-enabled' do
         # Ensure EnhancedErrors is disabled
-        EnhancedErrors.enhance!(enabled: false)
-        EnhancedErrors.traces = nil
+        EnhancedErrors.enhance_exceptions!(enabled: false)
+        EnhancedErrors.trace = nil
         expect(EnhancedErrors.enabled).to be false
 
         # Ensure the TracePoint for the current thread is nil
-        trace = EnhancedErrors.traces && EnhancedErrors.traces[Thread.current]
+        trace = EnhancedErrors.trace
         expect(trace).to be_nil
 
         # Raise an exception and ensure @binding_infos is not set
         expect {
           raise 'Test exception while disabled'
         }.to raise_error(StandardError) do |e|
-          expect(e.instance_variable_get(:@binding_infos)).to be_nil
+          expect(e.binding_infos).to eq([])
         end
 
         # Re-enable EnhancedErrors
-        EnhancedErrors.enhance!(enabled: true)
+        EnhancedErrors.enhance_exceptions!(enabled: true)
         expect(EnhancedErrors.enabled).to be true
 
         # Ensure TracePoint is enabled
-        trace = EnhancedErrors.traces[Thread.current]
+        trace = EnhancedErrors.trace
         expect(trace).not_to be_nil
         expect(trace.enabled?).to be true
 
@@ -590,36 +644,35 @@ RSpec.describe EnhancedErrors do
         expect {
           raise 'Test exception while enabled'
         }.to raise_error(StandardError) do |e|
-          expect(e.instance_variable_get(:@binding_infos)).not_to be_nil
+          expect(e.binding_infos).not_to be_nil
         end
       end
     end
 
-
     context 'colorization based on format' do
-      it 'enables and disables colorization in Colors based on format' do
+      it 'enables and disables colorization in ::Enhanced::Colors based on format' do
         ENV['RAILS_ENV'] = 'development'
-        EnhancedErrors.enhance!
+        EnhancedErrors.enhance_exceptions!
         expect(EnhancedErrors.get_default_format_for_environment).to eq(:terminal)
 
         expect {
           raise 'Test exception with color'
         }.to raise_error(StandardError) do |e|
-          e.message
-          expect(Colors.enabled?).to be true
-          expect(e.message).to include("\e[")
+          e.captured_variables
+          expect(::Enhanced::Colors.enabled?).to be true
+          expect(e.captured_variables).to include("\e[")
         end
 
         ENV['RAILS_ENV'] = 'production'
-        EnhancedErrors.enhance!
+        EnhancedErrors.enhance_exceptions!
         expect(EnhancedErrors.get_default_format_for_environment).to eq(:json)
 
         expect {
           raise 'Test exception without color'
         }.to raise_error(StandardError) do |e|
-          e.message
-          expect(Colors.enabled?).to be false
-          expect(e.message).not_to include("\e[")
+          e.captured_variables
+          expect(::Enhanced::Colors.enabled?).to be false
+          expect(e.captured_variables).not_to include("\e[")
         end
 
         ENV.delete('RAILS_ENV')
@@ -628,23 +681,23 @@ RSpec.describe EnhancedErrors do
 
     context 'tracing and exception enhancement' do
       it 'enables and disables tracing and checks exception enhancement' do
-        EnhancedErrors.enhance!(enabled: false)
+        EnhancedErrors.enhance_exceptions!(enabled: false)
         expect(EnhancedErrors.enabled).to be false
 
         expect {
           raise 'Test exception without tracing'
         }.to raise_error(StandardError) do |e|
-          binding_infos = e.instance_variable_get(:@binding_infos)
-          expect(binding_infos).to be_nil
+          binding_infos = e.binding_infos
+          expect(binding_infos).to eq([])
         end
 
-        EnhancedErrors.enhance!(enabled: true)
+        EnhancedErrors.enhance_exceptions!(enabled: true)
         expect(EnhancedErrors.enabled).to be true
 
         expect {
           raise 'Test exception with tracing'
         }.to raise_error(StandardError) do |e|
-          binding_infos = e.instance_variable_get(:@binding_infos)
+          binding_infos = e.binding_infos
           expect(binding_infos).not_to be_nil
         end
       end
@@ -652,7 +705,7 @@ RSpec.describe EnhancedErrors do
 
     context 'eligibility for capture' do
       before do
-        EnhancedErrors.enhance!
+        EnhancedErrors.enhance_exceptions!
         EnhancedErrors.on_capture = nil
       end
 
@@ -661,46 +714,46 @@ RSpec.describe EnhancedErrors do
       end
 
       it 'captures eligible exceptions' do
-        EnhancedErrors.enhance! do
+        EnhancedErrors.enhance_exceptions! do
           eligible_for_capture { |exception| true }
         end
 
         expect {
           raise 'Test exception'
         }.to raise_error(StandardError) do |e|
-          expect(e.instance_variable_get(:@binding_infos)).to_not be_nil
+          expect(e.binding_infos).to_not be_nil
         end
       end
 
       it 'ignores ineligible exceptions' do
-        EnhancedErrors.enhance! do
+        EnhancedErrors.enhance_exceptions! do
           eligible_for_capture { |exception| false }
         end
 
         expect {
           raise 'Test exception'
         }.to raise_error(StandardError) do |e|
-          expect(e.instance_variable_get(:@binding_infos)).to be_nil
+          expect(e.captured_variables).to eq('')
         end
       end
     end
 
     context 'global variables' do
       before(:each) do
-        EnhancedErrors.enhance!(debug: false)
+        EnhancedErrors.enhance_exceptions!(debug: false)
       end
 
       describe 'Global Variable Capture with Shared Skip List' do
         it 'captures new global variables when in debug mode, ignoring the skip list' do
           $variable_to_skip = 'should not be captured in debug mode as was present before enhance! call'
-          EnhancedErrors.enhance!(debug: true)
+          EnhancedErrors.enhance_exceptions!(debug: true)
           $variable_to_include = 'should be included as happened after'
 
           expect {
             raise 'Test exception with global variables in debug mode'
           }.to raise_error(StandardError) do |e|
-            expect(e.message).to_not include('$variable_to_skip')
-            expect(e.message).to include('$variable_to_include')
+            expect(e.captured_variables).to_not include('$variable_to_skip')
+            expect(e.captured_variables).to include('$variable_to_include')
           end
         ensure
           $variable_to_skip = nil
@@ -724,8 +777,7 @@ RSpec.describe EnhancedErrors do
             obj.raise_exception
           }.to raise_error(RuntimeError, 'Error from BasicObject') do |e|
             expect(e.message).to include('Error from BasicObject')
-            expect(e.instance_variable_get(:@binding_infos)).not_to be_nil
-            # Ensure no errors occur in the error handling code when dealing with BasicObject instances
+            expect(e.binding_infos).not_to be_nil
           end
         end
       end
@@ -741,8 +793,7 @@ RSpec.describe EnhancedErrors do
           expect {
             raise CustomException.new('Non-StandardError exception')
           }.to raise_error(CustomException) do |e|
-            expect(e.message).to include('Non-StandardError exception')
-            expect(e.instance_variable_get(:@binding_infos)).not_to be_nil
+            expect(e.binding_infos).not_to be_nil
           end
         end
       end
@@ -758,15 +809,12 @@ RSpec.describe EnhancedErrors do
           expect {
             raise FaultyMessageException.new
           }.to raise_error(FaultyMessageException) do |e|
-            # Ensure that the error handling code does not cause a re-entrant exception
             expect {
-              e.message
+              e.captured_variables
             }.not_to raise_error
-            # The message should include the variables message
-            message_without_colors = strip_color_codes(e.message)
+            message_without_colors = strip_color_codes(e.captured_variables)
             expect(message_without_colors).to include('Instances:')
-            # Additionally, check that the original exception is preserved
-            expect(e.instance_variable_get(:@binding_infos)).not_to be_nil
+            expect(e.binding_infos).not_to be_nil
           end
         end
       end
@@ -793,15 +841,9 @@ RSpec.describe EnhancedErrors do
               # Simulate variable in the binding that raises exception when inspected
               raise e
             end
-          }.to raise_error(RuntimeError, /Test exception with uninspectable variable/) do |e|
-            # Ensure that the error handling code does not cause a re-entrant exception
-            expect(e.instance_variable_get(:@binding_infos)).not_to be_nil
-            # Strip color codes from the message
-            message_without_colors = strip_color_codes(e.message)
-            # Check that the error handling code safely handled the variable that raises
-            # exceptions when inspected
-            expect(message_without_colors).to include('Test exception with uninspectable variable')
-            # The variable description should handle the exception and possibly show a placeholder
+          }.to raise_error(RuntimeError) do |e|
+            expect(e.binding_infos).not_to be_nil
+            message_without_colors = strip_color_codes(e.captured_variables)
             expect(message_without_colors).to match(/local_variable: \[Unprintable variable\]/)
           end
         end

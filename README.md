@@ -2,7 +2,7 @@
 
 ## Overview
 
-**EnhancedErrors** is a pure Ruby gem that enhances exception messages by capturing and appending variables and their values from the scope where the error was raised.
+**EnhancedErrors** is a pure Ruby gem that enhances exceptions by capturing variables and their values from the scope where the error was raised.
 
 **EnhancedErrors** leverages Ruby's built-in [TracePoint](https://ruby-doc.org/core-3.1.0/TracePoint.html) feature to provide detailed context for exceptions, making debugging easier without significant performance overhead.
 
@@ -16,7 +16,10 @@ When an exception is raised, EnhancedErrors captures the surrounding context.  I
 require 'enhanced_errors'
 require 'awesome_print' # Optional, for better output
 
-EnhancedErrors.enhance!
+# Enable capturing of variables at exception at raise-time. The .captured_variables method
+# is added to all Exceptions and gets populated with in-scope variables and values on `raise`
+
+EnhancedErrors.enhance_exceptions!
 
 def foo
   begin
@@ -24,18 +27,19 @@ def foo
     @myinstance = 10
     foo = @myinstance / myvar
   rescue => e
-    puts e.message
+    puts e.captured_variables
   end
 end
 
 foo
-
 ```
 
 ##### Output:
 
 <img src="./doc/images/enhanced-error.png" style="height: 215px; width: 429px;"></img>
 <br>
+
+
 #### Enhanced Exception In Specs:
 
 ```ruby
@@ -59,6 +63,67 @@ end
 #### Output:
 
 <img src="./doc/images/enhanced-spec.png" style="height: 369px; width: 712px;"></img>
+
+# RSpec Setup
+
+The simplest way to get started with EnhancedErrors is to use it for RSpec
+exception capturing. To get variable output into RSpec, the approach below
+enables capturing, but also gives nice output by formatting the failure message
+with the variable capture.
+
+The advantage of this approach is that it is only active for your spec runs.
+This approach is ideal for CI and local testing because it doesn't make
+any changes that should bleed through to production--it doesn't enhance
+exceptions except those that pass by during the RSpec run.
+
+```ruby
+
+RSpec.configure do |config|
+   
+  # add these config changes to your RSpec config to get variable messages
+  config.before(:suite) do
+    RSpec::Core::Example.prepend(Enhanced::Integrations::RSpecErrorFailureMessage)
+  end
+  
+  config.before(:example) do |_example|
+    EnhancedErrors.start_rspec_binding_capture
+  end
+
+  config.after(:example) do |example|
+    example.metadata[:expect_binding] = EnhancedErrors.stop_rspec_binding_capture
+  end
+  
+end
+
+```
+
+## Minitest
+
+Untested as of yet, but enhance_exceptions!(override_messages: true) is likely to work.
+
+If anyone wants to look into an integration implementation like RSpec, it would
+be welcomed. With a more targeted approach like the RSpec one, exceptions could be captured and 
+modified only during test time, like the RSpec approach. This would be advantageous as
+it wouldn't modify the exception message itself, but still makes the variable output available in
+test messages.
+
+## Enhancing .message
+
+EnhancedErrors can also append the captured variable description into the Exception's
+.message method output if the override_messages argument is true. 
+
+This can be very convenient as it lets you capture and diagnose 
+the context of totally unanticipated exceptions without modifying all your error handlers. 
+
+The downside to this approach is that if you have expectations in your tests/specs 
+around exception messages, those may break. Also, if you are doing something with the error messages, 
+like storing them in a database, they could be *much* longer and that may pose an issue.
+
+Ideally, use exception.captured_variables instead.
+
+```ruby
+EnhancedErrors.enhance_exceptions!(override_messages: true)
+```
 
 
 ## Features
@@ -116,28 +181,35 @@ $ gem install enhanced_errors
 
 ## Basic Usage
 
-To enable EnhancedErrors, call the `enhance!` method:
+To enable EnhancedErrors, call the `enhance_exceptions!` method:
 
 ```ruby
-# For a rails app, put this in an initializer, or spec_helper.rb
-# ex:  config/initializers/enhanced_errors.rb
-
+# For a rails app, you may put this in an initializer, or spec_helper.rb
+# ex:  config/initializers/enhanced.rb
+# you should immediately see nice errors with variables in your logs
+ 
 require 'awesome_print' # Optional, for better output
-EnhancedErrors.enhance!
+EnhancedErrors.enhance_exceptions!(override_messages: true)
 
-# -> now your error messages will have variables and their values appended to them.
 
 ```
 
-This activates the TracePoint to start capturing exceptions and their surrounding context.
+The approach above activates the TracePoint to start capturing exceptions and their surrounding context.
+It also overrides the .message to have the variables.
 
+If modifying your exception handlers is an option, it is better *not* to use
+override_messages: true, but instead just use the exception.captured_variables, which is
+a string describing what was found, that is available regardless. 
+
+Note that a minimalistic approach is taken to generating the string--if no qualifying variables were present, you won't see any message!
 
 ### Configuration Options
 
-You can pass configuration options to `enhance!`:
+You can pass configuration options to `enhance_exceptions!`:
 
 ```ruby
-EnhancedErrors.enhance!(enabled: true, max_length: 2000) do
+
+EnhancedErrors.enhance_exceptions!(enabled: true, max_length: 2000) do
   # Additional configuration here
   add_to_skip_list :@instance_variable_to_skip, :local_to_skip
 end
@@ -145,7 +217,7 @@ end
 ```
 - `add_to_skip_list`: Variables to ignore, as symbols. ex:  :@instance_variable_to_skip, :local_to_skip`
 - `enabled`: Enables or disables the enhancement (default: `true`).
-- `max_length`: Sets the maximum length of the enhanced message (default: `2500`).
+- `max_length`: Sets the maximum length of the captured_variables string (default: `2500`).
 
 Currently, the first `raise` exception binding is presented. 
 This may be changed in the future to allow more binding data to be presented.
@@ -236,7 +308,7 @@ end
 
 #### Using `on_format`
 
-`on_format` is the last stop for the message string that will be appended to `exception.message`.
+`on_format` is the last stop for the message string that will be `exception.captured_variables`.
 
 Here it can be encrypted, rewritten, or otherwise modified.
 
@@ -257,7 +329,7 @@ You can add additional variables to the skip list as needed:
 
 ```ruby
  
-EnhancedErrors.enhance! do
+EnhancedErrors.enhance_exceptions! do
   add_to_skip_list :@variable_to_skip
 end
 
@@ -271,15 +343,11 @@ The skip list is pre-populated with common variables to exclude and can be exten
 These exceptions are always ignored:
 
 ```ruby
-SystemExit,
-NoMemoryError,
-SignalException,
-Interrupt,
-ScriptError,
-LoadError,
-NotImplementedError,
-SyntaxError,
-SystemStackError
+SystemExit NoMemoryError SignalException Interrupt
+ScriptError LoadError NotImplementedError SyntaxError
+RSpec::Expectations::ExpectationNotMetError
+RSpec::Matchers::BuiltIn::RaiseError
+SystemStackError Psych::BadAlias
 ```
 
 While this is close to "Things that don't descend from StandardError", it's not exactly that.
@@ -299,7 +367,6 @@ EnhancedErrors supports different capture levels to control the verbosity of the
 The info mode is recommended.
 
 
-
 ### Capture Types
 
 EnhancedErrors differentiates between two types of capture events:
@@ -307,8 +374,9 @@ EnhancedErrors differentiates between two types of capture events:
 - **`raise`**: Captures the context when an exception is initially raised.
 - **`rescue`**: Captures the context when an exception is last rescued.
 
-**Default Behavior**: By default, EnhancedErrors returns the first `raise` and the last `rescue` event for each exception. 
+**Default Behavior**: By default, EnhancedErrors starts with rescue capture off.
 The `rescue` exception is only available in Ruby 3.2+ as it was added to TracePoint events in Ruby 3.2.
+If enabled, it returns the first `raise` and the last `rescue` event for each exception. 
 
 
 ### Example: Redacting Sensitive Information
@@ -338,8 +406,13 @@ When an exception is raised or rescued, it captures:
 
 The captured data includes a `capture_event` field indicating whether the data was captured during a `raise` or `rescue` event. By default, EnhancedErrors returns the first `raise` and the last `rescue` event for each exception, providing a clear trace of the exception lifecycle.
 
-The captured data is then appended to the exception's message, providing rich context for debugging.
+The captured data is available in .captured_variables, to provide context for debugging.
 
+* EnhancedErrors does not persist captured data--it only keep it in memory for the lifetime of the exception.
+* There are benchmarks around Tracepoint in the benchmark folder. Targeted tracepoints
+seem to be very cheap--as in, you can hit them ten thousand+ times a second
+without heavy overhead.
+* 
 
 ## Awesome Print
 
@@ -352,6 +425,7 @@ if you want to use it.
 ```ruby
 gem 'awesome_print'
 ```
+
 
 ## Alternatives
 
@@ -384,7 +458,8 @@ Ruby's TracePoint binding capture very narrowly with no other C API or dependenc
 
 - **TBD**: Memory considerations. This does capture data when an exception happens. EnhancedErrors hides under the bed when it sees **NoMemoryError**.
 
-- **Goal: Production Safety**: The gem is designed to, once vetted, be safe for production use, giving you valuable insights without compromising performance. I suggest letting it get well-vetted before making the leap and testing it for both performance and memory under load internally, as well.
+- **Goal: Production Safety**: The gem is designed to, eventually, be made safe for production use, giving you valuable insights without compromising performance.
+I would not enable it in production *yet*.
 
 ## Contributing
 

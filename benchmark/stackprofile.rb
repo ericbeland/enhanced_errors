@@ -1,10 +1,10 @@
 require 'stackprof'
-require_relative '../lib/enhanced_errors' # Adjust the path if necessary
+require_relative '../lib/enhanced/enhanced' # Adjust the path if necessary
 
 # gem install stackprof
 
 # adjust path as needed
-# ruby ./lib/core_ext/enhanced_errors/benchmark/stackprofile.rb
+# ruby ./lib/core_ext/enhanced/benchmark/stackprofile.rb
 # dumps to current folder. read the stackprof dump:
 # stackprof stackprof.dump
 
@@ -12,7 +12,7 @@ require_relative '../lib/enhanced_errors' # Adjust the path if necessary
 ITERATIONS = 10_000
 
 def run_with_enhanced_errors
-  EnhancedErrors.enhance!(debug: false)
+  EnhancedErrors.enhance_exceptions!(debug: false, override_messages: true)
   ITERATIONS.times do
     begin
       raise 'Test exception with EnhancedErrors'
