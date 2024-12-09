@@ -191,6 +191,7 @@ class EnhancedErrors
       @rspec_tracepoint = nil
 
       @rspec_tracepoint = TracePoint.new(:b_return) do |tp|
+        # This is super-kluge-y and should be replaced with... something TBD
         if tp.self.class.name =~ /RSpec::ExampleGroups::[A-Z0-9]+.*/ &&
            tp.method_id.nil? &&
            !(tp.path =~ /rspec/) &&
