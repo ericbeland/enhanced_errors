@@ -30,15 +30,18 @@ class EnhancedErrors
 
     # Add @__memoized and @__inspect_output to the skip list so they don't appear in output
     RSPEC_SKIP_LIST = Set.new([
+                                :@example,
                                 :@fixture_cache,
                                 :@fixture_cache_key,
+                                :@fixture_connections,
                                 :@fixture_connection_pools,
+                                :@loaded_fixtures,
                                 :@connection_subscriber,
                                 :@saved_pool_configs,
-                                :@loaded_fixtures,
+                                :@legacy_saved_pool_configs,
                                 :@matcher_definitions,
-                                :@__memoized, # Added to skip from output
-                                :@__inspect_output # Added to skip from output
+                                :@__memoized,
+                                :@__inspect_output
                               ])
 
     RAILS_SKIP_LIST = Set.new([
@@ -188,7 +191,10 @@ class EnhancedErrors
       @rspec_tracepoint = nil
 
       @rspec_tracepoint = TracePoint.new(:b_return) do |tp|
-        if tp.self.class.name =~ /RSpec::ExampleGroups::[a-zA-Z0-9]+$/ && tp.method_id.nil? && !(tp.path =~ /rspec/)
+        if tp.self.class.name =~ /RSpec::ExampleGroups::[A-Z0-9]+.*/ &&
+           tp.method_id.nil? &&
+           !(tp.path =~ /rspec/) &&
+           tp.path =~ /_spec\.rb$/
           @rspec_example_binding = tp.binding
         end
       end
@@ -196,7 +202,8 @@ class EnhancedErrors
     end
 
     def stop_rspec_binding_capture
-      @rspec_tracepoint.disable if @rspec_tracepoint
+      @rspec_tracepoint&.disable
+      @rspec_tracepoint = nil
       binding_info = convert_binding_to_binding_info(@rspec_example_binding) if @rspec_example_binding
       @rspec_example_binding = nil
       binding_info

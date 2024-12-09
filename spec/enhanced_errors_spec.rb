@@ -52,6 +52,10 @@ RSpec.describe EnhancedErrors do
       @instance_variable = 'instance_value'
     end
 
+    after(:each) do
+      EnhancedErrors.enhance_exceptions!(enabled: false)
+    end
+
     context 'override_messages option' do
       it 'does not override the exception message if override_messages: false' do
         EnhancedErrors.enhance_exceptions!(override_messages: false)
@@ -86,7 +90,7 @@ RSpec.describe EnhancedErrors do
       end
 
       after(:all) do
-        binding_info = EnhancedErrors.stop_rspec_binding_capture
+        EnhancedErrors.stop_rspec_binding_capture
       end
 
       it 'captures bindings from RSpec test blocks via start/stop methods' do
@@ -95,10 +99,13 @@ RSpec.describe EnhancedErrors do
     end
 
     context 'EnhancedErrors.stop_rspec_binding_capture' do
+
       it 'does not capture bindings if start_rspec_binding_capture was not called' do
-        binding = EnhancedErrors.stop_rspec_binding_capture
-        expect(binding).to be_nil
+        EnhancedErrors.stop_rspec_binding_capture
+        binding_info = EnhancedErrors.stop_rspec_binding_capture
+        expect(binding_info).to be_nil
       end
+
     end
 
     context 'variable capture' do
@@ -127,6 +134,8 @@ RSpec.describe EnhancedErrors do
         expect(EnhancedErrors.get_default_format_for_environment).to eq(:json)
 
         ENV.delete('RAILS_ENV')
+      ensure
+        EnhancedErrors.enhance_exceptions!(enabled: false)
       end
     end
 
@@ -195,6 +204,10 @@ RSpec.describe EnhancedErrors do
     end
 
     context 'multiple variable appends' do
+      after(:each) do
+        EnhancedErrors.enhance_exceptions!(enabled: false)
+      end
+
       it 'only appends variables once' do
         EnhancedErrors.enhance_exceptions!
         expect {
@@ -217,6 +230,11 @@ RSpec.describe EnhancedErrors do
     end
 
     context 'variable exclusion' do
+
+      after(:each) do
+        EnhancedErrors.enhance_exceptions!(enabled: false)
+      end
+
       it 'excludes variables in the skip list from binding information' do
         @variable_to_skip = 'should be skipped'
         @variable_to_include = 'should be included'
