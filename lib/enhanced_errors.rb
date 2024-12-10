@@ -580,17 +580,29 @@ class EnhancedErrors
     end
 
     def determine_object_name(tp, method_name = '')
-      if tp.self&.is_a?(Class) && tp.self&.singleton_class == tp.defined_class
-        object_identifier = safe_to_s(tp.self)
-        method_suffix = method_name && !method_name.empty? ? ".#{method_name}" : ""
-        "#{object_identifier}#{method_suffix}"
-      else
-        object_class_name = safe_to_s(tp.self&.class&.name || 'UnknownClass')
-        method_suffix = method_name && !method_name.empty? ? "##{method_name}" : ""
-        "#{object_class_name}#{method_suffix}"
+      begin
+        # These tricks are used to get around the fact that `tp.self` can be a class that is
+        # wired up with method_missing where every direct call alters the class. This is true
+        # on certain builders or config objects and caused problems.
+
+        # Directly bind and call the `class` method to avoid triggering `method_missing`
+        self_class = Object.instance_method(:class).bind(tp.self).call
+
+        # Similarly, bind and call `singleton_class` safely
+        singleton_class = Object.instance_method(:singleton_class).bind(tp.self).call
+
+        if self_class && tp.defined_class == singleton_class
+          object_identifier = safe_to_s(tp.self)
+          method_suffix = method_name && !method_name.empty? ? ".#{method_name}" : ""
+          "#{object_identifier}#{method_suffix}"
+        else
+          object_class_name = safe_to_s(self_class.name || 'UnknownClass')
+          method_suffix = method_name && !method_name.empty? ? "##{method_name}" : ""
+          "#{object_class_name}#{method_suffix}"
+        end
+      rescue Exception => e
+        '[ErrorGettingName]'
       end
-    rescue Exception => e
-      '[ErrorGettingName]'
     end
 
     def get_global_variable_value(var)
