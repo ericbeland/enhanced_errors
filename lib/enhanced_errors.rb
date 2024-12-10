@@ -22,7 +22,7 @@ class EnhancedErrors
                   :override_messages
 
     GEMS_REGEX = %r{[\/\\]gems[\/\\]}
-    DEFAULT_MAX_LENGTH = 2500
+    DEFAULT_MAX_LENGTH = 3000
 
     # Maximum binding infos we will track per-exception instance. This is intended as an extra
     # safety rail, not a normal scenario.
@@ -30,6 +30,8 @@ class EnhancedErrors
 
     # Add @__memoized and @__inspect_output to the skip list so they don't appear in output
     RSPEC_SKIP_LIST = Set.new([
+                                :@assertions,
+                                :@integration_session,
                                 :@example,
                                 :@fixture_cache,
                                 :@fixture_cache_key,
@@ -38,6 +40,7 @@ class EnhancedErrors
                                 :@loaded_fixtures,
                                 :@connection_subscriber,
                                 :@saved_pool_configs,
+                                :@assertion_instance,
                                 :@legacy_saved_pool_configs,
                                 :@matcher_definitions,
                                 :@__memoized,
@@ -50,11 +53,13 @@ class EnhancedErrors
                                 :@association_cache,
                                 :@readonly,
                                 :@previously_new_record,
+                                :@routes, # usually just shows #<ActionDispatch::Routing::RouteSet:0x000000016087d708>
                                 :@destroyed,
                                 :@marked_for_destruction,
                                 :@destroyed_by_association,
                                 :@primary_key,
                                 :@strict_loading,
+                                :@assertion_instance,
                                 :@strict_loading_mode,
                                 :@mutations_before_last_save,
                                 :@mutations_from_database,
@@ -62,7 +67,8 @@ class EnhancedErrors
                                 :@predicate_builder,
                                 :@generated_relation_method,
                                 :@find_by_statement_cache,
-                                :@arel_table
+                                :@arel_table,
+                                :@response_klass,
                               ])
 
     @enabled = false
@@ -192,10 +198,14 @@ class EnhancedErrors
 
       @rspec_tracepoint = TracePoint.new(:b_return) do |tp|
         # This is super-kluge-y and should be replaced with... something TBD
-        if tp.self.class.name =~ /RSpec::ExampleGroups::[A-Z0-9]+.*/ &&
+
+        # fixes cases where class and name are screwed up or overridden
+        name = determine_object_name(tp)
+
+        if name =~ /RSpec::ExampleGroups::[A-Z0-9]+.*/ &&
            tp.method_id.nil? &&
-           !(tp.path =~ /rspec/) &&
-           tp.path =~ /_spec\.rb$/
+           !(tp.path.to_s =~ /rspec/) &&
+           tp.path.to_s =~ /_spec\.rb$/
           @rspec_example_binding = tp.binding
         end
       end
@@ -562,27 +572,31 @@ class EnhancedErrors
           value = locals.include?(name) ? safe_local_variable_get(bind, name) : nil
           "#{name}=#{safe_inspect(value)}"
         rescue => e
-          "#{name}=#<Error getting argument: #{e.message}>"
+          "#{name}=[Error getting argument: #{e.message}]"
         end.join(", ")
       rescue => e
-        "#<Error getting arguments: #{e.message}>"
+        "[Error getting arguments: #{e.message}]"
       end
     end
 
-    def determine_object_name(tp, method_name)
-      if tp.self.is_a?(Class) && tp.self.singleton_class == tp.defined_class
-        "#{safe_to_s(tp.self)}.#{method_name}"
+    def determine_object_name(tp, method_name = '')
+      if tp.self&.is_a?(Class) && tp.self&.singleton_class == tp.defined_class
+        object_identifier = safe_to_s(tp.self)
+        method_suffix = method_name && !method_name.empty? ? ".#{method_name}" : ""
+        "#{object_identifier}#{method_suffix}"
       else
-        "#{safe_to_s(tp.self.class.name)}##{method_name}"
+        object_class_name = safe_to_s(tp.self&.class&.name || 'UnknownClass')
+        method_suffix = method_name && !method_name.empty? ? "##{method_name}" : ""
+        "#{object_class_name}#{method_suffix}"
       end
-    rescue => e
-      "#<Error inspecting value: #{e.message}>"
+    rescue Exception => e
+      '[ErrorGettingName]'
     end
 
     def get_global_variable_value(var)
       var.is_a?(Symbol) ? eval("#{var}") : nil
     rescue => e
-      "#<Error getting value for #{var}>"
+      "[Error getting value for #{var}]"
     end
 
     def method_and_args_desc(method_info)
