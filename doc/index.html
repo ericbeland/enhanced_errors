@@ -62,7 +62,7 @@
 
 <h2 id="label-Overview">Overview</h2>
 
-<p><strong>EnhancedErrors</strong> is a pure Ruby gem that enhances exception messages by capturing and appending variables and their values from the scope where the error was raised.</p>
+<p><strong>EnhancedErrors</strong> is a pure Ruby gem that enhances exceptions by capturing variables and their values from the scope where the error was raised.</p>
 
 <p><strong>EnhancedErrors</strong> leverages Ruby’s built-in <a href="https://ruby-doc.org/core-3.1.0/TracePoint.html">TracePoint</a> feature to provide detailed context for exceptions, making debugging easier without significant performance overhead.</p>
 
@@ -74,7 +74,10 @@
 <span class='id identifier rubyid_require'>require</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>enhanced_errors</span><span class='tstring_end'>&#39;</span></span>
 <span class='id identifier rubyid_require'>require</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>awesome_print</span><span class='tstring_end'>&#39;</span></span> <span class='comment'># Optional, for better output
 </span>
-<span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_enhance!'><span class='object_link'><a href="EnhancedErrors.html#enhance!-class_method" title="EnhancedErrors.enhance! (method)">enhance!</a></span></span>
+<span class='comment'># Enable capturing of variables at exception at raise-time. The .captured_variables method
+</span><span class='comment'># is added to all Exceptions and gets populated with in-scope variables and values on `raise`
+</span>
+<span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_enhance_exceptions!'><span class='object_link'><a href="EnhancedErrors.html#enhance_exceptions!-class_method" title="EnhancedErrors.enhance_exceptions! (method)">enhance_exceptions!</a></span></span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_foo'>foo</span>
   <span class='kw'>begin</span>
@@ -82,7 +85,7 @@
     <span class='ivar'>@myinstance</span> <span class='op'>=</span> <span class='int'>10</span>
     <span class='id identifier rubyid_foo'>foo</span> <span class='op'>=</span> <span class='ivar'>@myinstance</span> <span class='op'>/</span> <span class='id identifier rubyid_myvar'>myvar</span>
   <span class='kw'>rescue</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_e'>e</span>
-    <span class='id identifier rubyid_puts'>puts</span> <span class='id identifier rubyid_e'>e</span><span class='period'>.</span><span class='id identifier rubyid_message'>message</span>
+    <span class='id identifier rubyid_puts'>puts</span> <span class='id identifier rubyid_e'>e</span><span class='period'>.</span><span class='id identifier rubyid_captured_variables'>captured_variables</span>
   <span class='kw'>end</span>
 <span class='kw'>end</span>
 
@@ -116,15 +119,57 @@
 
 <p>&lt;img src=“./doc/images/enhanced-spec.png” style=“height: 369px; width: 712px;”&gt;&lt;/img&gt;</p>
 
+<h1 id="label-RSpec+Setup">RSpec Setup</h1>
+
+<p>The simplest way to get started with EnhancedErrors is to use it for RSpec exception capturing. To get variable output into RSpec, the approach below enables capturing, but also gives nice output by formatting the failure message with the variable capture.</p>
+
+<p>The advantage of this approach is that it is only active for your spec runs. This approach is ideal for CI and local testing because it doesn’t make any changes that should bleed through to production–it doesn’t enhance exceptions except those that pass by during the RSpec run.</p>
+
+<pre class="code ruby"><code class="ruby">
+<span class='const'>RSpec</span><span class='period'>.</span><span class='id identifier rubyid_configure'>configure</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_config'>config</span><span class='op'>|</span>
+   
+  <span class='comment'># add these config changes to your RSpec config to get variable messages
+</span>  <span class='id identifier rubyid_config'>config</span><span class='period'>.</span><span class='id identifier rubyid_before'>before</span><span class='lparen'>(</span><span class='symbol'>:suite</span><span class='rparen'>)</span> <span class='kw'>do</span>
+    <span class='const'>RSpec</span><span class='op'>::</span><span class='const'>Core</span><span class='op'>::</span><span class='const'>Example</span><span class='period'>.</span><span class='id identifier rubyid_prepend'>prepend</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="Enhanced.html" title="Enhanced (module)">Enhanced</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Enhanced/Integrations.html" title="Enhanced::Integrations (module)">Integrations</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Enhanced/Integrations/RSpecErrorFailureMessage.html" title="Enhanced::Integrations::RSpecErrorFailureMessage (module)">RSpecErrorFailureMessage</a></span></span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+  
+  <span class='id identifier rubyid_config'>config</span><span class='period'>.</span><span class='id identifier rubyid_before'>before</span><span class='lparen'>(</span><span class='symbol'>:example</span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid__example'>_example</span><span class='op'>|</span>
+    <span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_start_rspec_binding_capture'><span class='object_link'><a href="EnhancedErrors.html#start_rspec_binding_capture-class_method" title="EnhancedErrors.start_rspec_binding_capture (method)">start_rspec_binding_capture</a></span></span>
+  <span class='kw'>end</span>
+
+  <span class='id identifier rubyid_config'>config</span><span class='period'>.</span><span class='id identifier rubyid_after'>after</span><span class='lparen'>(</span><span class='symbol'>:example</span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_example'>example</span><span class='op'>|</span>
+    <span class='id identifier rubyid_example'>example</span><span class='period'>.</span><span class='id identifier rubyid_metadata'>metadata</span><span class='lbracket'>[</span><span class='symbol'>:expect_binding</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_stop_rspec_binding_capture'><span class='object_link'><a href="EnhancedErrors.html#stop_rspec_binding_capture-class_method" title="EnhancedErrors.stop_rspec_binding_capture (method)">stop_rspec_binding_capture</a></span></span>
+  <span class='kw'>end</span>
+  
+<span class='kw'>end</span>
+</code></pre>
+
+<h2 id="label-Minitest">Minitest</h2>
+
+<p>Untested as of yet, but enhance_exceptions!(override_messages: true) is likely to work.</p>
+
+<p>If anyone wants to look into an integration implementation like RSpec, it would be welcomed. With a more targeted approach like the RSpec one, exceptions could be captured and modified only during test time, like the RSpec approach. This would be advantageous as it wouldn’t modify the exception message itself, but still makes the variable output available in test messages.</p>
+
+<h2 id="label-Enhancing+.message">Enhancing .message</h2>
+
+<p>EnhancedErrors can also append the captured variable description into the Exception’s .message method output if the override_messages argument is true.</p>
+
+<p>This can be very convenient as it lets you capture and diagnose the context of totally unanticipated exceptions without modifying all your error handlers.</p>
+
+<p>The downside to this approach is that if you have expectations in your tests/specs around exception messages, those may break. Also, if you are doing something with the error messages, like storing them in a database, they could be <em>much</em> longer and that may pose an issue.</p>
+
+<p>Ideally, use exception.captured_variables instead.</p>
+
+<pre class="code ruby"><code class="ruby"><span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_enhance_exceptions!'><span class='object_link'><a href="EnhancedErrors.html#enhance_exceptions!-class_method" title="EnhancedErrors.enhance_exceptions! (method)">enhance_exceptions!</a></span></span><span class='lparen'>(</span><span class='label'>override_messages:</span> <span class='kw'>true</span><span class='rparen'>)</span>
+</code></pre>
+
 <h2 id="label-Features">Features</h2>
 <ul><li>
 <p><strong>Pure Ruby</strong>: No external dependencies, C extensions, or C API calls.</p>
 </li><li>
-<p><strong>Lightweight</strong>: Minimal performance impact, as tracing is only active during exception raising.</p>
-</li><li>
 <p><strong>Customizable Output</strong>: Supports multiple output formats (<code>:json</code>, <code>:plaintext</code>, <code>:terminal</code>).</p>
 </li><li>
-<p><strong>Flexible Hooks</strong>: Redact or modifying captured data via the <code>on_capture</code> hook.</p>
+<p><strong>Flexible Hooks</strong>: Redact or modifying captured data via the <code>on_capture</code> hook. Update the final string with on_format.</p>
 </li><li>
 <p><strong>Environment-Based Defaults</strong>: For Rails apps, automatically adjusts settings based on the environment (<code>development</code>, <code>test</code>, <code>production</code>, <code>ci</code>).</p>
 </li><li>
@@ -135,25 +180,27 @@
 <p><strong>Capture Types</strong>: Captures variables from the first <code>raise</code> and the last <code>rescue</code> for an exception by default.</p>
 </li><li>
 <p><strong>No dependencies</strong>: EnhancedErrors does not <strong><em>require</em></strong> any dependencies–it uses <a href="https://github.com/awesome-print/awesome_print">awesome_print</a> for nicer output if it is installed and available.</p>
+</li><li>
+<p><strong>Lightweight</strong>: Minimal performance impact, as tracing is only active during exception raising.</p>
 </li></ul>
 
 <p>EnhancedErrors has a few big use-cases:</p>
 <ul><li>
 <p><strong>Catch Data-driven bugs</strong>. For example, if, while processing a 10 gig file, you get an error, you can’t just re-run the code with a debugger. You also can’t just print out all the data, because it’s too big. You want to know what the data was the cause of the error. Ideally, without long instrument-re-run-fix loops. If your logging didn’t capture the data, normally, you’d be stuck.</p>
 </li><li>
-<p><strong>Debug</strong> a complex application erroring deep in the stack when you can’t tell where the error originates</p>
+<p><strong>Debug</strong> a complex application erroring deep in the stack when you can’t tell where the error originates.</p>
 </li><li>
-<p><strong>Faster TDD</strong> - Often, you won’t have to re-run to see an error–you can go straight to the fix.</p>
+<p><strong>Reduce MTTR</strong> Reduce mean time to resolution.</p>
 </li><li>
 <p><strong>Faster CI -&gt; Fix loop</strong>. When a bug happens in CI, usually there’s a step where you first reproduce it locally.  EnhancedErrors can help you skip that step.</p>
 </li><li>
-<p><strong>Faster debugging</strong>. In general, you can skip the add-instrumentation step and jump to the fix.</p>
+<p><strong>Faster TDD</strong>. In general, you can skip the add-instrumentation step and jump to the fix. Usually, you won’t have to re-run to see an error.</p>
 </li><li>
 <p><strong>Heisenbugs</strong> - bugs that disappear when you try to debug them. EnhancedErrors can help you capture the data that causes the bug before it disappears.</p>
 </li><li>
 <p><strong>Unknown Unknowns</strong> - you can’t pre-emptively log variables from failure cases you never imagined.</p>
 </li><li>
-<p><strong>Cron jobs</strong> and <strong>daemons</strong> - when it fails for unknown reasons at 4am, check the log and fix–it probably has what you need.</p>
+<p><strong>Cron jobs</strong> and <strong>daemons</strong> - when it fails for unknown reasons at 4am, check the log and fix–it probably has what you need. Note that</p>
 </li></ul>
 
 <h2 id="label-Installation">Installation</h2>
@@ -175,24 +222,28 @@
 
 <h2 id="label-Basic+Usage">Basic Usage</h2>
 
-<p>To enable EnhancedErrors, call the <code>enhance!</code> method:</p>
+<p>To enable EnhancedErrors, call the <code>enhance_exceptions!</code> method:</p>
 
-<pre class="code ruby"><code class="ruby"><span class='comment'># For a rails app, put this in an initializer, or spec_helper.rb
-</span><span class='comment'># ex:  config/initializers/enhanced_errors.rb
-</span>
+<pre class="code ruby"><code class="ruby"><span class='comment'># For a rails app, you may put this in an initializer, or spec_helper.rb
+</span><span class='comment'># ex:  config/initializers/enhanced.rb
+</span><span class='comment'># you should immediately see nice errors with variables in your logs
+</span> 
 <span class='id identifier rubyid_require'>require</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>awesome_print</span><span class='tstring_end'>&#39;</span></span> <span class='comment'># Optional, for better output
-</span><span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_enhance!'><span class='object_link'><a href="EnhancedErrors.html#enhance!-class_method" title="EnhancedErrors.enhance! (method)">enhance!</a></span></span>
+</span><span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_enhance_exceptions!'><span class='object_link'><a href="EnhancedErrors.html#enhance_exceptions!-class_method" title="EnhancedErrors.enhance_exceptions! (method)">enhance_exceptions!</a></span></span><span class='lparen'>(</span><span class='label'>override_messages:</span> <span class='kw'>true</span><span class='rparen'>)</span>
+</code></pre>
 
-<span class='comment'># -&gt; now your error messages will have variables and their values appended to them.
-</span></code></pre>
+<p>The approach above activates the TracePoint to start capturing exceptions and their surrounding context. It also overrides the .message to have the variables.</p>
 
-<p>This activates the TracePoint to start capturing exceptions and their surrounding context.</p>
+<p>If modifying your exception handlers is an option, it is better <em>not</em> to use override_messages: true, but instead just use the exception.captured_variables, which is a string describing what was found, that is available regardless.</p>
+
+<p>Note that a minimalistic approach is taken to generating the string–if no qualifying variables were present, you won’t see any message!</p>
 
 <h3 id="label-Configuration+Options">Configuration Options</h3>
 
-<p>You can pass configuration options to <code>enhance!</code>:</p>
+<p>You can pass configuration options to <code>enhance_exceptions!</code>:</p>
 
-<pre class="code ruby"><code class="ruby"><span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_enhance!'><span class='object_link'><a href="EnhancedErrors.html#enhance!-class_method" title="EnhancedErrors.enhance! (method)">enhance!</a></span></span><span class='lparen'>(</span><span class='label'>enabled:</span> <span class='kw'>true</span><span class='comma'>,</span> <span class='label'>max_length:</span> <span class='int'>2000</span><span class='rparen'>)</span> <span class='kw'>do</span>
+<pre class="code ruby"><code class="ruby">
+<span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_enhance_exceptions!'><span class='object_link'><a href="EnhancedErrors.html#enhance_exceptions!-class_method" title="EnhancedErrors.enhance_exceptions! (method)">enhance_exceptions!</a></span></span><span class='lparen'>(</span><span class='label'>enabled:</span> <span class='kw'>true</span><span class='comma'>,</span> <span class='label'>max_length:</span> <span class='int'>2000</span><span class='rparen'>)</span> <span class='kw'>do</span>
   <span class='comment'># Additional configuration here
 </span>  <span class='id identifier rubyid_add_to_skip_list'>add_to_skip_list</span> <span class='symbol'>:@instance_variable_to_skip</span><span class='comma'>,</span> <span class='symbol'>:local_to_skip</span>
 <span class='kw'>end</span>
@@ -202,7 +253,7 @@
 </li><li>
 <p><code>enabled</code>: Enables or disables the enhancement (default: <code>true</code>).</p>
 </li><li>
-<p><code>max_length</code>: Sets the maximum length of the enhanced message (default: <code>2500</code>).</p>
+<p><code>max_length</code>: Sets the maximum length of the captured_variables string (default: <code>2500</code>).</p>
 </li></ul>
 
 <p>Currently, the first <code>raise</code> exception binding is presented. This may be changed in the future to allow more binding data to be presented.</p>
@@ -293,7 +344,7 @@
 
 <h4 id="label-Using+on_format">Using <code>on_format</code></h4>
 
-<p><code>on_format</code> is the last stop for the message string that will be appended to <code>exception.message</code>.</p>
+<p><code>on_format</code> is the last stop for the message string that will be <code>exception.captured_variables</code>.</p>
 
 <p>Here it can be encrypted, rewritten, or otherwise modified.</p>
 
@@ -307,7 +358,7 @@
 <p>EnhancedErrors comes with predefined skip lists to exclude sensitive or irrelevant variables. By default, the skip list is used to remove a lot of framework noise from Rails and RSpec. You can add additional variables to the skip list as needed:</p>
 
 <pre class="code ruby"><code class="ruby">
-<span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_enhance!'><span class='object_link'><a href="EnhancedErrors.html#enhance!-class_method" title="EnhancedErrors.enhance! (method)">enhance!</a></span></span> <span class='kw'>do</span>
+<span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_enhance_exceptions!'><span class='object_link'><a href="EnhancedErrors.html#enhance_exceptions!-class_method" title="EnhancedErrors.enhance_exceptions! (method)">enhance_exceptions!</a></span></span> <span class='kw'>do</span>
   <span class='id identifier rubyid_add_to_skip_list'>add_to_skip_list</span> <span class='symbol'>:@variable_to_skip</span>
 <span class='kw'>end</span>
 </code></pre>
@@ -318,15 +369,11 @@
 
 <p>These exceptions are always ignored:</p>
 
-<pre class="code ruby"><code class="ruby">SystemExit,
-NoMemoryError,
-SignalException,
-Interrupt,
-ScriptError,
-LoadError,
-NotImplementedError,
-SyntaxError,
-SystemStackError
+<pre class="code ruby"><code class="ruby"><span class='const'>SystemExit</span> <span class='const'>NoMemoryError</span> <span class='const'>SignalException</span> <span class='const'>Interrupt</span>
+<span class='const'>ScriptError</span> <span class='const'>LoadError</span> <span class='const'>NotImplementedError</span> <span class='const'>SyntaxError</span>
+<span class='const'>RSpec</span><span class='op'>::</span><span class='const'>Expectations</span><span class='op'>::</span><span class='const'>ExpectationNotMetError</span>
+<span class='const'>RSpec</span><span class='op'>::</span><span class='const'>Matchers</span><span class='op'>::</span><span class='const'>BuiltIn</span><span class='op'>::</span><span class='const'>RaiseError</span>
+<span class='const'>SystemStackError</span> <span class='const'>Psych</span><span class='op'>::</span><span class='const'>BadAlias</span>
 </code></pre>
 
 <p>While this is close to “Things that don’t descend from StandardError”, it’s not exactly that.</p>
@@ -353,7 +400,7 @@ SystemStackError
 <p><strong><code>rescue</code></strong>: Captures the context when an exception is last rescued.</p>
 </li></ul>
 
-<p><strong>Default Behavior</strong>: By default, EnhancedErrors returns the first <code>raise</code> and the last <code>rescue</code> event for each exception. The <code>rescue</code> exception is only available in Ruby 3.2+ as it was added to TracePoint events in Ruby 3.2.</p>
+<p><strong>Default Behavior</strong>: By default, EnhancedErrors starts with rescue capture off. The <code>rescue</code> exception is only available in Ruby 3.2+ as it was added to TracePoint events in Ruby 3.2. If enabled, it returns the first <code>raise</code> and the last <code>rescue</code> event for each exception.</p>
 
 <h3 id="label-Example-3A+Redacting+Sensitive+Information">Example: Redacting Sensitive Information</h3>
 
@@ -385,7 +432,14 @@ SystemStackError
 
 <p>The captured data includes a <code>capture_event</code> field indicating whether the data was captured during a <code>raise</code> or <code>rescue</code> event. By default, EnhancedErrors returns the first <code>raise</code> and the last <code>rescue</code> event for each exception, providing a clear trace of the exception lifecycle.</p>
 
-<p>The captured data is then appended to the exception’s message, providing rich context for debugging.</p>
+<p>The captured data is available in .captured_variables, to provide context for debugging.</p>
+<ul><li>
+<p>EnhancedErrors does not persist captured data--it only keep it in memory for the lifetime of the exception.</p>
+</li><li>
+<p>There are benchmarks around Tracepoint in the benchmark folder. Targeted tracepoints seem to be very cheap--as in, you can hit them ten thousand+ times a second without heavy overhead.</p>
+</li></ul>
+
+<p>*</p>
 
 <h2 id="label-Awesome+Print">Awesome Print</h2>
 
@@ -394,11 +448,36 @@ SystemStackError
 <pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_gem'>gem</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>awesome_print</span><span class='tstring_end'>&#39;</span></span>
 </code></pre>
 
+<h2 id="label-Alternatives">Alternatives</h2>
+
+<p>Why not use:</p>
+
+<p><a href="https://github.com/banister/binding_of_caller">binding_of_caller</a> or <a href="https://github.com/pry/pry">Pry</a> or <a href="https://github.com/BetterErrors/better_errors">better_errors</a>?</p>
+
+<p>First off, these gems are, I cannot stress this enough, a-m-a-z-i-n-g!!! I use them every day–kudos to their creators and maintainers!</p>
+
+<p>This is intended for different use-cases. In sum, the goal of this gem is an every-day driver for <strong>non-interactive</strong> variable inspection.</p>
+
+<p>With EnhancedErrors is that I want extra details when I run into a problem I <strong>didn’t anticipate ahead of time</strong>. To make that work, it has to be able to safely be ‘on’ all the time, and it has to gather the data in a way I naturally will see it without requiring extra preparation I obviously didn’t know to do.</p>
+<ul><li>
+<p>That won’t interrupt CI, but also, that lets me know what happened without reproduction</p>
+</li><li>
+<p>That could, theoretically, also be fine in production (if data security, redaction, access, and encryption concerns were all addressed–Ok, big list, but another option is to selectively enable targeted capture)</p>
+</li><li>
+<p>Has decent performance characteristics</p>
+</li><li>
+<p><strong>Only</strong> becomes active in exception raise/rescue scenarios</p>
+</li></ul>
+
+<p>This gem could have been implemented using binding_of_caller, or the gem it depends on, <a href="https://rubygems.org/gems/debug_inspector/versions/1.1.0?locale=en">debug_inspector</a>. However, the recommendation is not to use those in production as they use C API extensions. This doesn’t. This selectively uses Ruby’s TracePoint binding capture very narrowly with no other C API or dependencies, and only to target Exceptions–not to allow universal calls to the prior binding. It doesn’t work as a debugger, but that also means it can, with care, operate safely in a narrow scope–becoming active only when exceptions are raised.</p>
+
 <h2 id="label-Performance+Considerations">Performance Considerations</h2>
 <ul><li>
-<p><strong>Minimal Overhead</strong>: Since TracePoint is only activated during exception raising and rescuing, the performance impact is negligible during normal operation.</p>
+<p><strong>Minimal Overhead</strong>: Since TracePoint is only activated during exception raising and rescuing, the performance impact is negligible during normal operation. (Benchmark included)</p>
 </li><li>
-<p><strong>Production Safe</strong>: The gem is designed to be safe for production use, giving you valuable insights without compromising performance. Although this is the case, I’d still suggest letting it get well-vetted before making the leap.</p>
+<p><strong>TBD</strong>: Memory considerations. This does capture data when an exception happens. EnhancedErrors hides under the bed when it sees <strong>NoMemoryError</strong>.</p>
+</li><li>
+<p><strong>Goal: Production Safety</strong>: The gem is designed to, eventually, be made safe for production use, giving you valuable insights without compromising performance. I would not enable it in production <em>yet</em>.</p>
 </li></ul>
 
 <h2 id="label-Contributing">Contributing</h2>
@@ -411,7 +490,7 @@ SystemStackError
 </div></div>
 
       <div id="footer">
-  Generated on Sun Nov 10 12:01:13 2024 by
+  Generated on Mon Dec  9 19:25:47 2024 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.37 (ruby-3.1.3).
 </div>
