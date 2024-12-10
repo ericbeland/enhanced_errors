@@ -199,16 +199,16 @@ class EnhancedErrors
       @rspec_tracepoint = TracePoint.new(:b_return) do |tp|
         # This is super-kluge-y and should be replaced with... something TBD
 
-        # fixes cases where class and name are screwed up or overridden
-        name = determine_object_name(tp)
-
-        if name =~ /RSpec::ExampleGroups::[A-Z0-9]+.*/ &&
-           tp.method_id.nil? &&
-           !(tp.path.to_s =~ /rspec/) &&
-           tp.path.to_s =~ /_spec\.rb$/
-          @rspec_example_binding = tp.binding
+        # early easy checks to nope out of the object name and other checks
+        if tp.method_id.nil? && !(tp.path.to_s =~ /rspec/) && tp.path.to_s =~ /_spec\.rb$/
+         # fixes cases where class and name are screwed up or overridden
+          if determine_object_name(tp) =~ /RSpec::ExampleGroups::[A-Z0-9]+.*/ &&
+            @rspec_example_binding = tp.binding
+          end
         end
+
       end
+
       @rspec_tracepoint.enable
     end
 
