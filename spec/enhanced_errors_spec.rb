@@ -614,7 +614,7 @@ RSpec.describe EnhancedErrors do
         EnhancedErrors.enhance_exceptions!(enabled: false)
         disabled_trace = EnhancedErrors.trace
         # we have switched to cleaning it up, as it seems safer
-        expect(disabled_trace).to be nil
+        expect(disabled_trace.enabled?).to be_falsey
       end
 
       it 'caps max binding_infos to track at 10' do
@@ -627,7 +627,7 @@ RSpec.describe EnhancedErrors do
             # EnhancedErrors processes the exception here
           end
         end
-        expect(exception.binding_infos.size).to eq(10)
+        expect(exception.binding_infos.size).to eq(3)
       ensure
         EnhancedErrors.enhance_exceptions!(enabled: false)
       end

@@ -22,11 +22,12 @@ class EnhancedErrors
                   :override_messages
 
     GEMS_REGEX = %r{[\/\\]gems[\/\\]}
-    DEFAULT_MAX_LENGTH = 3000
+    RSPEC_EXAMPLE_REGEXP = /RSpec::ExampleGroups::[A-Z0-9]+.*/
+    DEFAULT_MAX_LENGTH = 2000
 
     # Maximum binding infos we will track per-exception instance. This is intended as an extra
     # safety rail, not a normal scenario.
-    MAX_BINDING_INFOS = 10
+    MAX_BINDING_INFOS = 3
 
     # Add @__memoized and @__inspect_output to the skip list so they don't appear in output
     RSPEC_SKIP_LIST = Set.new([
@@ -45,7 +46,7 @@ class EnhancedErrors
                                 :@matcher_definitions,
                                 :@__memoized,
                                 :@__inspect_output
-                              ])
+                              ]).freeze
 
     RAILS_SKIP_LIST = Set.new([
                                 :@new_record,
@@ -55,6 +56,7 @@ class EnhancedErrors
                                 :@previously_new_record,
                                 :@routes, # usually just shows #<ActionDispatch::Routing::RouteSet:0x000000016087d708>
                                 :@destroyed,
+                                :@response, #usually big, gets truncated anyway
                                 :@marked_for_destruction,
                                 :@destroyed_by_association,
                                 :@primary_key,
@@ -69,7 +71,9 @@ class EnhancedErrors
                                 :@find_by_statement_cache,
                                 :@arel_table,
                                 :@response_klass,
-                              ])
+                              ]).freeze
+
+    DEFAULT_SKIP_LIST = (RAILS_SKIP_LIST + RSPEC_SKIP_LIST).freeze
 
     @enabled = false
 
@@ -92,11 +96,7 @@ class EnhancedErrors
     end
 
     def skip_list
-      @skip_list ||= default_skip_list
-    end
-
-    def default_skip_list
-      Set.new(RAILS_SKIP_LIST).merge(RSPEC_SKIP_LIST)
+      @skip_list ||= DEFAULT_SKIP_LIST.dup
     end
 
     # takes an exception and bindings, calculates the variables message
@@ -129,7 +129,6 @@ class EnhancedErrors
         @original_global_variables = nil
         @enabled = false
         @trace&.disable
-        @trace = nil
       else
         # if there's an old one, disable it before replacing it
         # this seems to actually matter, although it seems like it
@@ -139,7 +138,7 @@ class EnhancedErrors
 
         @enabled = true
         @debug = debug
-        @original_global_variables = global_variables
+        @original_global_variables = global_variables if @debug
 
         options.each do |key, value|
           setter_method = "#{key}="
@@ -177,15 +176,14 @@ class EnhancedErrors
 
     def safely_prepend_rspec_custom_failure_message
       return if @rspec_failure_message_loaded
-      if defined?(RSpec::Core::Example)
+      if defined?(RSpec::Core::Example) && !RSpec::Core::Example < Enhanced::Integrations::RSpecErrorFailureMessage
         RSpec::Core::Example.prepend(Enhanced::Integrations::RSpecErrorFailureMessage)
         @rspec_failure_message_loaded = true
-      else
-
       end
     rescue => e
-      puts "Failed "
+      puts "Failed to prepend RSpec custom failure message: #{e.message}"
     end
+
 
     def start_rspec_binding_capture
       @rspec_example_binding = nil
@@ -194,15 +192,14 @@ class EnhancedErrors
       # the tracepoint without disabling it seemed to accumulate traces
       # in the test suite where things are disabled and re-enabled often.
       @rspec_tracepoint&.disable
-      @rspec_tracepoint = nil
 
       @rspec_tracepoint = TracePoint.new(:b_return) do |tp|
         # This is super-kluge-y and should be replaced with... something TBD
 
         # early easy checks to nope out of the object name and other checks
-        if tp.method_id.nil? && !(tp.path.to_s =~ /rspec/) && tp.path.to_s =~ /_spec\.rb$/
+        if tp.method_id.nil? && !(tp.path =~ /rspec/) && tp.path =~ /_spec\.rb$/
          # fixes cases where class and name are screwed up or overridden
-          if determine_object_name(tp) =~ /RSpec::ExampleGroups::[A-Z0-9]+.*/ &&
+          if determine_object_name(tp) =~ RSPEC_EXAMPLE_REGEXP
             @rspec_example_binding = tp.binding
           end
         end
@@ -214,7 +211,6 @@ class EnhancedErrors
 
     def stop_rspec_binding_capture
       @rspec_tracepoint&.disable
-      @rspec_tracepoint = nil
       binding_info = convert_binding_to_binding_info(@rspec_example_binding) if @rspec_example_binding
       @rspec_example_binding = nil
       binding_info
@@ -647,15 +643,20 @@ class EnhancedErrors
     end
 
     def safe_inspect(variable)
-      variable.inspect
+      str = variable.inspect
+      if str.length > 1200
+        str[0...1200] + '...'
+      else
+        str
+      end
     rescue
       safe_to_s(variable)
     end
 
     def safe_to_s(variable)
       str = variable.to_s
-      if str.length > 140
-        str[0...140] + '...'
+      if str.length > 120
+        str[0...120] + '...'
       else
         str
       end
