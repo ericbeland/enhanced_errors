@@ -12,7 +12,6 @@ IGNORED_EXCEPTIONS = %w[SystemExit NoMemoryError SignalException Interrupt
                         RSpec::Matchers::BuiltIn::RaiseError
                         SystemStackError Psych::BadAlias]
 
-
 class EnhancedErrors
   extend ::Enhanced
 
@@ -34,6 +33,7 @@ class EnhancedErrors
                                 :@assertions,
                                 :@integration_session,
                                 :@example,
+                                :@assertion_delegator,
                                 :@fixture_cache,
                                 :@fixture_cache_key,
                                 :@fixture_connections,
@@ -54,7 +54,9 @@ class EnhancedErrors
                                 :@association_cache,
                                 :@readonly,
                                 :@previously_new_record,
-                                :@routes, # usually just shows #<ActionDispatch::Routing::RouteSet:0x000000016087d708>
+                                :@_routes, # usually just shows #<ActionDispatch::Routing::RouteSet:0x000000016087d708>
+                                :@routes,
+                                :@app,
                                 :@destroyed,
                                 :@response, #usually big, gets truncated anyway
                                 :@marked_for_destruction,
@@ -65,6 +67,7 @@ class EnhancedErrors
                                 :@strict_loading_mode,
                                 :@mutations_before_last_save,
                                 :@mutations_from_database,
+                                :@integration_session,
                                 :@relation_delegate_cache,
                                 :@predicate_builder,
                                 :@generated_relation_method,
@@ -125,7 +128,7 @@ class EnhancedErrors
       @original_global_variables = nil
       @override_messages = override_messages
 
-      if enabled == false
+      if !enabled
         @original_global_variables = nil
         @enabled = false
         @trace&.disable
@@ -134,7 +137,6 @@ class EnhancedErrors
         # this seems to actually matter, although it seems like it
         # shouldn't
         @trace&.disable
-        @trace = nil
 
         @enabled = true
         @debug = debug
@@ -197,7 +199,7 @@ class EnhancedErrors
         # This is super-kluge-y and should be replaced with... something TBD
 
         # early easy checks to nope out of the object name and other checks
-        if tp.method_id.nil? && !(tp.path =~ /rspec/) && tp.path =~ /_spec\.rb$/
+        if tp.method_id.nil? && !(tp.path.include?('rspec')) && tp.path.end_with?('_spec.rb')
          # fixes cases where class and name are screwed up or overridden
           if determine_object_name(tp) =~ RSPEC_EXAMPLE_REGEXP
             @rspec_example_binding = tp.binding
@@ -257,8 +259,7 @@ class EnhancedErrors
 
       # Apply skip list to remove @__memoized and @__inspect_output from output
       # but only after extracting let variables.
-      binding_info = default_on_capture(binding_info)
-      binding_info
+      default_on_capture(binding_info)
     end
 
     def eligible_for_capture(&block)
@@ -354,12 +355,11 @@ class EnhancedErrors
     end
 
     def apply_skip_list(binding_info)
-      unless @debug
-        variables = binding_info[:variables]
-        variables[:instances]&.reject! { |var, _| skip_list.include?(var) || (var.to_s.start_with?('@_') && !@debug) }
-        variables[:locals]&.reject! { |var, _| skip_list.include?(var) }
-        variables[:globals]&.reject! { |var, _| skip_list.include?(var) }
-      end
+      variables = binding_info[:variables]
+      variables[:instances]&.reject! { |var, _| skip_list.include?(var) || (var.to_s.start_with?('@_') && !@debug) }
+      variables[:locals]&.reject! { |var, _| skip_list.include?(var) }
+      return binding_info unless @debug
+      variables[:globals]&.reject! { |var, _| skip_list.include?(var) }
       binding_info
     end
 
@@ -390,7 +390,7 @@ class EnhancedErrors
 
       instance_vars_to_display = variables[:instances] || {}
 
-      if instance_vars_to_display && !instance_vars_to_display.empty?
+      unless instance_vars_to_display.empty?
         result += "\n#{Colors.green('Instances:')}\n#{variable_description(instance_vars_to_display)}"
       end
 
@@ -516,11 +516,12 @@ class EnhancedErrors
     end
 
     def default_capture_events
+      return @default_capture_events if @default_capture_events
       events = [:raise]
       if capture_rescue && Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3.0')
         events << :rescue
       end
-      Set.new(events)
+      @default_capture_events = events
     end
 
     def validate_and_set_capture_events(capture_events)

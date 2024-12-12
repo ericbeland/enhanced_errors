@@ -159,7 +159,7 @@ RSpec.describe EnhancedErrors do
             it 'sets @capture_events to Set containing :raise' do
               EnhancedErrors.capture_rescue = false
               EnhancedErrors.send(:validate_and_set_capture_events, nil)
-              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise]))
+              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise])
             end
           end
 
@@ -168,7 +168,7 @@ RSpec.describe EnhancedErrors do
 
             it 'sets @capture_events to Set containing :raise only' do
               EnhancedErrors.send(:validate_and_set_capture_events, nil)
-              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise]))
+              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise])
             end
           end
         end
