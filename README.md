@@ -79,33 +79,19 @@ exceptions except those that pass by during the RSpec run.
 ```ruby
 
 RSpec.configure do |config|
-   
-  # add these config changes to your RSpec config to get variable messages
-  config.before(:suite) do
-    RSpec::Core::Example.prepend(Enhanced::Integrations::RSpecErrorFailureMessage)
-  end
-  
   config.before(:example) do |_example|
     EnhancedErrors.start_rspec_binding_capture
   end
 
   config.after(:example) do |example|
     example.metadata[:expect_binding] = EnhancedErrors.stop_rspec_binding_capture
+    EnhancedErrors.override_exception_message(example.exception, example.metadata[:expect_binding])
   end
-  
 end
-
 ```
 
-## Minitest
+## TODO: Minitest
 
-Untested as of yet, but enhance_exceptions!(override_messages: true) is likely to work.
-
-If anyone wants to look into an integration implementation like RSpec, it would
-be welcomed. With a more targeted approach like the RSpec one, exceptions could be captured and 
-modified only during test time, like the RSpec approach. This would be advantageous as
-it wouldn't modify the exception message itself, but still makes the variable output available in
-test messages.
 
 ## Enhancing .message
 
