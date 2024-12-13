@@ -106,7 +106,7 @@ class EnhancedErrors
     def override_exception_message(exception, binding_or_bindings)
       # Ensure binding_or_bindings is always an array for compatibility
       return exception if binding_or_bindings.nil? || binding_or_bindings.empty?
-      return exception if exception.respond_to?(:unaltered_message)
+      return nil unless exception && !(exception.respond_to?(:unaltered_message))
       variable_str = EnhancedErrors.format(binding_or_bindings)
       message_str = exception.message
       exception.define_singleton_method(:unaltered_message) { message_str }
