@@ -84,8 +84,7 @@ RSpec.configure do |config|
   end
 
   config.after(:example) do |example|
-    example.metadata[:expect_binding] = EnhancedErrors.stop_rspec_binding_capture
-    EnhancedErrors.override_exception_message(example.exception, example.metadata[:expect_binding])
+    EnhancedErrors.override_exception_message(example.exception, EnhancedErrors.stop_rspec_binding_capture)
   end
 end
 ```
