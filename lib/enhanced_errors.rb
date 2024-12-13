@@ -3,14 +3,13 @@
 require 'set'
 require 'json'
 
-require_relative 'enhanced/integrations/rspec_error_failure_message'
 require_relative 'enhanced/colors'
 
 IGNORED_EXCEPTIONS = %w[SystemExit NoMemoryError SignalException Interrupt
-                        ScriptError LoadError NotImplementedError SyntaxError
-                        RSpec::Expectations::ExpectationNotMetError
-                        RSpec::Matchers::BuiltIn::RaiseError
-                        SystemStackError Psych::BadAlias]
+ ScriptError LoadError NotImplementedError SyntaxError
+ RSpec::Expectations::ExpectationNotMetError
+ RSpec::Matchers::BuiltIn::RaiseError
+ SystemStackError Psych::BadAlias]
 
 class EnhancedErrors
   extend ::Enhanced
@@ -106,7 +105,8 @@ class EnhancedErrors
     # and modifies the exceptions .message to display the variables
     def override_exception_message(exception, binding_or_bindings)
       # Ensure binding_or_bindings is always an array for compatibility
-      return exception if binding_or_bindings.nil? || binding_or_bindings.empty? || exception.respond_to?(:unaltered_message)
+      return exception if binding_or_bindings.nil? || binding_or_bindings.empty?
+      return exception if exception.respond_to?(:unaltered_message)
       variable_str = EnhancedErrors.format(binding_or_bindings)
       message_str = exception.message
       exception.define_singleton_method(:unaltered_message) { message_str }
@@ -186,26 +186,36 @@ class EnhancedErrors
       puts "Failed to prepend RSpec custom failure message: #{e.message}"
     end
 
-
     def start_rspec_binding_capture
       @rspec_example_binding = nil
+      @capture_next_binding = false
 
       # In the Exception binding infos, I observed that re-setting
       # the tracepoint without disabling it seemed to accumulate traces
       # in the test suite where things are disabled and re-enabled often.
       @rspec_tracepoint&.disable
 
-      @rspec_tracepoint = TracePoint.new(:b_return) do |tp|
+      @rspec_tracepoint = TracePoint.new(:raise, :b_return) do |tp|
         # This is super-kluge-y and should be replaced with... something TBD
+        # only look at block returns once we have seen an ExpectationNotMetError
 
-        # early easy checks to nope out of the object name and other checks
-        if tp.method_id.nil? && !(tp.path.include?('rspec')) && tp.path.end_with?('_spec.rb')
-         # fixes cases where class and name are screwed up or overridden
-          if determine_object_name(tp) =~ RSPEC_EXAMPLE_REGEXP
-            @rspec_example_binding = tp.binding
+        case tp.event
+        when :b_return
+          # only active if we are capturing the next binding
+          next unless @capture_next_binding && @rspec_example_binding.nil?
+          # early easy checks to nope out of the object name and other checks
+          if @capture_next_binding && tp.method_id.nil? && !(tp.path.include?('rspec')) && tp.path.end_with?('_spec.rb')
+            # fixes cases where class and name are screwed up or overridden
+            if determine_object_name(tp) =~ RSPEC_EXAMPLE_REGEXP
+              @rspec_example_binding = tp.binding
+            end
+          end
+        when :raise
+          # turn on capture of next binding
+          if tp.raised_exception.class.name == 'RSpec::Expectations::ExpectationNotMetError'
+            @capture_next_binding ||= true
           end
         end
-
       end
 
       @rspec_tracepoint.enable
@@ -214,6 +224,7 @@ class EnhancedErrors
     def stop_rspec_binding_capture
       @rspec_tracepoint&.disable
       binding_info = convert_binding_to_binding_info(@rspec_example_binding) if @rspec_example_binding
+      @capture_next_binding = false
       @rspec_example_binding = nil
       binding_info
     end
@@ -621,7 +632,7 @@ class EnhancedErrors
 
     def variable_description(vars_hash)
       vars_hash.map do |name, value|
-        "  #{Colors.purple(name)}: #{format_variable(value)}\n"
+        " #{Colors.purple(name)}: #{format_variable(value)}\n"
       end.join
     rescue
       ''
