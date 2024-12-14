@@ -1,3 +1,5 @@
+# enhanced_errors.rb
+
 require 'set'
 require 'json'
 require 'monitor'
@@ -22,6 +24,7 @@ class EnhancedErrors
     # Adding enabled and capture_rescue to attr_accessor so the tests that expect
     # EnhancedErrors.enabled and EnhancedErrors.capture_rescue= ... work.
     attr_accessor :enabled, :capture_rescue, :config_block, :on_capture_hook, :eligible_for_capture, :trace, :override_messages
+    attr_accessor :max_capture_events, :capture_events_count
 
     GEMS_REGEX = %r{[\/\\]gems[\/\\]}
     RSPEC_EXAMPLE_REGEXP = /RSpec::ExampleGroups::[A-Z0-9]+.*/
@@ -96,6 +99,9 @@ class EnhancedErrors
     @override_messages = nil
     @rspec_failure_message_loaded = nil
 
+    @max_capture_events = -1   # -1 means no limit
+    @capture_events_count = 0
+
     # Override the writer methods to ensure thread safety
     def enabled=(val)
       mutex.synchronize { @enabled = val }
@@ -167,32 +173,43 @@ class EnhancedErrors
         if !enabled
           @original_global_variables = nil
           @enabled = false
-        else
-          @enabled = true
-          @debug = debug
-          @original_global_variables = global_variables if @debug
-
-          options.each do |key, value|
-            setter_method = "#{key}="
-            if respond_to?(setter_method)
-              send(setter_method, value)
-            elsif respond_to?(key)
-              send(key, value)
-            end
-          end
-
-          @config_block = block_given? ? block : nil
-          instance_eval(&@config_block) if @config_block
-
-          validate_and_set_capture_events(capture_events)
-
-          events = @capture_events ? @capture_events.to_a : default_capture_events
-          @trace = TracePoint.new(*events) do |tp|
-            handle_tracepoint_event(tp)
-          end
-
-          @trace.enable
+          return
         end
+
+        @enabled = true
+        @debug = debug
+        @original_global_variables = global_variables if @debug
+
+        options.each do |key, value|
+          setter_method = "#{key}="
+          if respond_to?(setter_method)
+            send(setter_method, value)
+          elsif respond_to?(key)
+            send(key, value)
+          end
+        end
+
+        @config_block = block_given? ? block : nil
+        instance_eval(&@config_block) if @config_block
+
+        validate_and_set_capture_events(capture_events)
+
+        # If max_capture_events == 0, capturing is off from the start.
+        if @max_capture_events == 0
+          @enabled = false
+          return
+        end
+
+        # If previously disabled due to limit and now conditions changed:
+        reenable_if_needed
+
+        events = @capture_events ? @capture_events.to_a : default_capture_events
+        @trace = TracePoint.new(*events) do |tp|
+          handle_tracepoint_event(tp)
+        end
+
+        # Only enable trace if still enabled and not limited
+        @trace.enable if @enabled && (@max_capture_events == -1 || @capture_events_count < @max_capture_events)
       end
     end
 
@@ -467,7 +484,53 @@ class EnhancedErrors
       ''
     end
 
+    def reset_capture_events_count
+      mutex.synchronize do
+        @capture_events_count = 0
+        reenable_if_needed
+      end
+    end
+
+    def max_capture_events=(value)
+      mutex.synchronize do
+        @max_capture_events = value
+        # Guard against 0 which means disabled
+        if @max_capture_events == 0
+          # Disable capturing
+          if @enabled
+            puts "EnhancedErrors: max_capture_events set to 0, disabling capturing."
+            @enabled = false
+            @trace&.disable
+          end
+        else
+          # If previously disabled due to hitting a limit and now this limit is relaxed
+          reenable_if_needed
+        end
+      end
+    end
+
     private
+
+    def reenable_if_needed
+      # If we have no limit (-1) or haven't reached the new limit yet, re-enable if disabled due to limit
+      return unless @enabled == true # Only try to re-enable if we are conceptually enabled
+
+      currently_disabled = @trace.nil? || !@trace.enabled?
+      can_capture = (@max_capture_events == -1) || (@capture_events_count < @max_capture_events)
+
+      if can_capture && currently_disabled && @trace
+        puts "EnhancedErrors: re-enabling capturing due to updated max_capture_events."
+        @trace.enable
+      elsif can_capture && @trace.nil? && @enabled
+        # If @trace is nil, we need to set it up again
+        events = @capture_events ? @capture_events.to_a : default_capture_events
+        @trace = TracePoint.new(*events) do |tp|
+          handle_tracepoint_event(tp)
+        end
+        puts "EnhancedErrors: re-enabling capturing due to updated max_capture_events."
+        @trace.enable
+      end
+    end
 
     def handle_tracepoint_event(tp)
       enabled_local = mutex.synchronize { @enabled }
@@ -553,6 +616,14 @@ class EnhancedErrors
           exception.binding_infos << binding_info
           mutex.synchronize do
             override_exception_message(exception, exception.binding_infos) if @override_messages
+            @capture_events_count += 1
+
+            # Check if we've hit the limit
+            if @max_capture_events > 0 && @capture_events_count >= @max_capture_events
+              puts "EnhancedErrors: max_capture_events limit (#{@max_capture_events}) reached, disabling capturing."
+              @enabled = false
+              @trace&.disable
+            end
           end
         end
       end
