@@ -2,14 +2,37 @@
 
 ## Overview
 
-**EnhancedErrors** is a pure Ruby gem that enhances exceptions by capturing variables and their values from the scope where the error was raised.
+**EnhancedErrors** is a pure Ruby gem that enhances exceptions by capturing variables and their values from the scope where the exception was raised.
 
 **EnhancedErrors** leverages Ruby's built-in [TracePoint](https://ruby-doc.org/core-3.1.0/TracePoint.html) feature to provide detailed context for exceptions, making debugging easier without significant performance overhead.
 
-When an exception is raised, EnhancedErrors captures the surrounding context.  It works like this:
+When an exception is raised, EnhancedErrors captures the surrounding context.  There are two main
+approaches to using it--from rspec, or to enhance all exceptions.
+
+The RSpec test-time only approach constrained only to test-time.
+
+# RSpec Setup
+
+The simplest way to get started with EnhancedErrors is to use it for RSpec
+exception capturing. This approach is only active during spec runs and is ideal for CI
+and local testing because it doesn't make any changes that should affect production.
+
+```ruby
+
+RSpec.configure do |config|
+  config.before(:example) do |_example|
+    EnhancedErrors.start_rspec_binding_capture
+  end
+
+  config.after(:example) do |example|
+    EnhancedErrors.override_exception_message(example.exception, EnhancedErrors.stop_rspec_binding_capture)
+  end
+end
+```
+
 <br>
 
-#### Enhanced Exception In Code:
+#### Enhanced Errors In Regular, Non-spec Exceptions:
 
 ```ruby
 
@@ -34,13 +57,33 @@ end
 foo
 ```
 
+
+## Enhancing .message
+
+EnhancedErrors can also append the captured variable description into the Exception's
+.message method output if the override_messages argument is true.
+
+This can be convenient as it lets you capture and diagnose
+the context of totally unanticipated exceptions without modifying all your error handlers.
+
+The downside can be that if you have expectations in your tests/specs
+around exception messages, those may break. Also, if you are doing something like storing the errors
+in a database, they could be *much* longer and that may pose an issue on field lengths.
+
+Ideally, use exception.captured_variables instead.
+
+```ruby
+EnhancedErrors.enhance_exceptions!(override_messages: true)
+```
+
+
 ##### Output:
 
 <img src="./doc/images/enhanced-error.png" style="height: 215px; width: 429px;"></img>
 <br>
 
 
-#### Enhanced Exception In Specs:
+#### Enhanced Errors In Specs:
 
 ```ruby
 describe 'sees through' do
@@ -64,52 +107,9 @@ end
 
 <img src="./doc/images/enhanced-spec.png" style="height: 369px; width: 712px;"></img>
 
-# RSpec Setup
 
-The simplest way to get started with EnhancedErrors is to use it for RSpec
-exception capturing. To get variable output into RSpec, the approach below
-enables capturing, but also gives nice output by formatting the failure message
-with the variable capture.
-
-The advantage of this approach is that it is only active for your spec runs.
-This approach is ideal for CI and local testing because it doesn't make
-any changes that should bleed through to production--it doesn't enhance
-exceptions except those that pass by during the RSpec run.
-
-```ruby
-
-RSpec.configure do |config|
-  config.before(:example) do |_example|
-    EnhancedErrors.start_rspec_binding_capture
-  end
-
-  config.after(:example) do |example|
-    EnhancedErrors.override_exception_message(example.exception, EnhancedErrors.stop_rspec_binding_capture)
-  end
-end
-```
 
 ## TODO: Minitest
-
-
-## Enhancing .message
-
-EnhancedErrors can also append the captured variable description into the Exception's
-.message method output if the override_messages argument is true. 
-
-This can be very convenient as it lets you capture and diagnose 
-the context of totally unanticipated exceptions without modifying all your error handlers. 
-
-The downside to this approach is that if you have expectations in your tests/specs 
-around exception messages, those may break. Also, if you are doing something with the error messages, 
-like storing them in a database, they could be *much* longer and that may pose an issue.
-
-Ideally, use exception.captured_variables instead.
-
-```ruby
-EnhancedErrors.enhance_exceptions!(override_messages: true)
-```
-
 
 ## Features
 

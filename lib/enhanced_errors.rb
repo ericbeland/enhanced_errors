@@ -4,6 +4,8 @@ require 'set'
 require 'json'
 
 require_relative 'enhanced/colors'
+require_relative 'enhanced/exception'
+
 
 IGNORED_EXCEPTIONS = %w[SystemExit NoMemoryError SignalException Interrupt
  ScriptError LoadError NotImplementedError SyntaxError
@@ -27,52 +29,51 @@ class EnhancedErrors
     # safety rail, not a normal scenario.
     MAX_BINDING_INFOS = 3
 
-    # Add @__memoized and @__inspect_output to the skip list so they don't appear in output
     RSPEC_SKIP_LIST = Set.new([
-                                :@assertions,
-                                :@integration_session,
-                                :@example,
+                                :@__inspect_output,
+                                :@__memoized,
                                 :@assertion_delegator,
+                                :@assertion_instance,
+                                :@assertions,
+                                :@connection_subscriber,
+                                :@example,
                                 :@fixture_cache,
                                 :@fixture_cache_key,
-                                :@fixture_connections,
                                 :@fixture_connection_pools,
-                                :@loaded_fixtures,
-                                :@connection_subscriber,
-                                :@saved_pool_configs,
-                                :@assertion_instance,
+                                :@fixture_connections,
+                                :@integration_session,
                                 :@legacy_saved_pool_configs,
+                                :@loaded_fixtures,
                                 :@matcher_definitions,
-                                :@__memoized,
-                                :@__inspect_output
+                                :@saved_pool_configs
                               ]).freeze
 
     RAILS_SKIP_LIST = Set.new([
-                                :@new_record,
-                                :@attributes,
-                                :@association_cache,
-                                :@readonly,
-                                :@previously_new_record,
-                                :@_routes, # usually just shows #<ActionDispatch::Routing::RouteSet:0x000000016087d708>
-                                :@routes,
+                                :@_routes,
                                 :@app,
-                                :@destroyed,
-                                :@response, #usually big, gets truncated anyway
-                                :@marked_for_destruction,
-                                :@destroyed_by_association,
-                                :@primary_key,
-                                :@strict_loading,
+                                :@arel_table,
                                 :@assertion_instance,
-                                :@strict_loading_mode,
+                                :@association_cache,
+                                :@attributes,
+                                :@destroyed,
+                                :@destroyed_by_association,
+                                :@find_by_statement_cache,
+                                :@generated_relation_method,
+                                :@integration_session,
+                                :@marked_for_destruction,
                                 :@mutations_before_last_save,
                                 :@mutations_from_database,
-                                :@integration_session,
-                                :@relation_delegate_cache,
+                                :@new_record,
                                 :@predicate_builder,
-                                :@generated_relation_method,
-                                :@find_by_statement_cache,
-                                :@arel_table,
+                                :@previously_new_record,
+                                :@primary_key,
+                                :@readonly,
+                                :@relation_delegate_cache,
+                                :@response,
                                 :@response_klass,
+                                :@routes,
+                                :@strict_loading,
+                                :@strict_loading_mode
                               ]).freeze
 
     DEFAULT_SKIP_LIST = (RAILS_SKIP_LIST + RSPEC_SKIP_LIST).freeze
@@ -105,10 +106,16 @@ class EnhancedErrors
     # and modifies the exceptions .message to display the variables
     def override_exception_message(exception, binding_or_bindings)
       # Ensure binding_or_bindings is always an array for compatibility
-      return exception if binding_or_bindings.nil? || binding_or_bindings.empty?
-      return nil unless exception && !(exception.respond_to?(:unaltered_message))
+      return nil unless exception
+      rspec_binding = !(binding_or_bindings.nil? || binding_or_bindings.empty?)
+      exception_binding = (exception.binding_infos.length > 0)
+      has_message = !(exception.respond_to?(:unaltered_message))
+      return nil unless (rspec_binding || exception_binding) && has_message
       variable_str = EnhancedErrors.format(binding_or_bindings)
       message_str = exception.message
+      if exception.respond_to?(:captured_variables) && !message_str.include?(exception.captured_variables)
+        message_str += exception.captured_variables
+      end
       exception.define_singleton_method(:unaltered_message) { message_str }
       exception.define_singleton_method(:message) do
         "#{message_str}#{variable_str}"
@@ -121,22 +128,19 @@ class EnhancedErrors
     end
 
     def enhance_exceptions!(enabled: true, debug: false, capture_events: nil, override_messages: false, **options, &block)
-      require_relative 'enhanced/exception'
-
       @output_format = nil
       @eligible_for_capture = nil
       @original_global_variables = nil
       @override_messages = override_messages
 
+      @trace&.disable
       if !enabled
         @original_global_variables = nil
         @enabled = false
-        @trace&.disable
       else
         # if there's an old one, disable it before replacing it
         # this seems to actually matter, although it seems like it
         # shouldn't
-        @trace&.disable
 
         @enabled = true
         @debug = debug
@@ -186,9 +190,21 @@ class EnhancedErrors
       puts "Failed to prepend RSpec custom failure message: #{e.message}"
     end
 
+    # Note: Differences between the rspec capture, and regular ehancement (EnhancedErrors.enhance_exceptions):
+    # We do modify the error message for RSpec capture, however we do it at
+    # the last minute, just as it is going to be printed. This solves some potential problems
+    # 1- Assertions that bank on a certain exact error message pass. Note, though
+    # that if you assert on the variable string being in the exception, when
+    # this type of decoration is running, the string isn't there. Not that you should
+    # be doing that anyway.
+    # 2 - If you do anything with storing exception messages in DB records or anywhere
+    # that is space-limited, or privacy concerning, these rspec message changes only happen in
+    # the context of RSpec, not in your app itself while it is running.
     def start_rspec_binding_capture
       @rspec_example_binding = nil
       @capture_next_binding = false
+
+      @enabled = true
 
       # In the Exception binding infos, I observed that re-setting
       # the tracepoint without disabling it seemed to accumulate traces
@@ -198,6 +214,7 @@ class EnhancedErrors
       @rspec_tracepoint = TracePoint.new(:raise, :b_return) do |tp|
         # This is super-kluge-y and should be replaced with... something TBD
         # only look at block returns once we have seen an ExpectationNotMetError
+
 
         case tp.event
         when :b_return
@@ -214,6 +231,8 @@ class EnhancedErrors
           # turn on capture of next binding
           if tp.raised_exception.class.name == 'RSpec::Expectations::ExpectationNotMetError'
             @capture_next_binding ||= true
+          else
+            handle_tracepoint_event(tp)
           end
         end
       end
@@ -430,8 +449,8 @@ class EnhancedErrors
       return if Thread.current[:enhanced_errors_processing] || Thread.current[:on_capture] || ignored_exception?(tp.raised_exception)
       Thread.current[:enhanced_errors_processing] = true
       exception = tp.raised_exception
-      capture_me = !exception.frozen? && EnhancedErrors.eligible_for_capture.call(exception)
 
+      capture_me = !exception.frozen? && EnhancedErrors.eligible_for_capture.call(exception)
       unless capture_me
         Thread.current[:enhanced_errors_processing] = false
         return
@@ -458,14 +477,12 @@ class EnhancedErrors
 
       globals = {}
       if @debug
-        globals = (global_variables - @original_global_variables).map { |var|
+        globals = (global_variables - @original_global_variables.to_a).map { |var|
           [var, get_global_variable_value(var)]
         }.to_h
       end
-
       capture_event = safe_to_s(tp.event)
       location = "#{safe_to_s(tp.path)}:#{safe_to_s(tp.lineno)}"
-
       binding_info = {
         source: location,
         object: tp.self,
@@ -483,7 +500,6 @@ class EnhancedErrors
       }
 
       binding_info = default_on_capture(binding_info)
-
       if on_capture_hook
         begin
           Thread.current[:on_capture] = true
@@ -497,19 +513,18 @@ class EnhancedErrors
 
       if binding_info
         binding_info = validate_binding_format(binding_info)
-
         if binding_info && exception.binding_infos.length >= MAX_BINDING_INFOS
           # delete from the middle of the array as the ends are most interesting
           exception.binding_infos.delete_at(MAX_BINDING_INFOS / 2.round)
         end
-
         if binding_info
           exception.binding_infos << binding_info
           override_exception_message(exception, exception.binding_infos) if @override_messages
         end
       end
-    rescue
+    rescue =>e
       # Avoid raising exceptions here
+
     ensure
       Thread.current[:enhanced_errors_processing] = false
     end
