@@ -1,11 +1,9 @@
-# enhanced_errors.rb
-
 require 'set'
 require 'json'
+require 'monitor'
 
 require_relative 'enhanced/colors'
 require_relative 'enhanced/exception'
-
 
 IGNORED_EXCEPTIONS = %w[SystemExit NoMemoryError SignalException Interrupt
  ScriptError LoadError NotImplementedError SyntaxError
@@ -17,16 +15,17 @@ class EnhancedErrors
   extend ::Enhanced
 
   class << self
-    attr_accessor :enabled, :config_block, :max_length, :on_capture_hook,
-                  :eligible_for_capture, :trace, :skip_list, :capture_rescue,
-                  :override_messages
+    def mutex
+      @monitor ||= Monitor.new
+    end
+
+    # Adding enabled and capture_rescue to attr_accessor so the tests that expect
+    # EnhancedErrors.enabled and EnhancedErrors.capture_rescue= ... work.
+    attr_accessor :enabled, :capture_rescue, :config_block, :on_capture_hook, :eligible_for_capture, :trace, :override_messages
 
     GEMS_REGEX = %r{[\/\\]gems[\/\\]}
     RSPEC_EXAMPLE_REGEXP = /RSpec::ExampleGroups::[A-Z0-9]+.*/
     DEFAULT_MAX_LENGTH = 2000
-
-    # Maximum binding infos we will track per-exception instance. This is intended as an extra
-    # safety rail, not a normal scenario.
     MAX_BINDING_INFOS = 3
 
     RSPEC_SKIP_LIST = Set.new([
@@ -49,7 +48,13 @@ class EnhancedErrors
                               ]).freeze
 
     RAILS_SKIP_LIST = Set.new([
+                                :@new_record,
+                                :@attributes,
+                                :@association_cache,
+                                :@readonly,
+                                :@previously_new_record,
                                 :@_routes,
+                                :@routes,
                                 :@app,
                                 :@arel_table,
                                 :@assertion_instance,
@@ -79,38 +84,59 @@ class EnhancedErrors
     DEFAULT_SKIP_LIST = (RAILS_SKIP_LIST + RSPEC_SKIP_LIST).freeze
 
     @enabled = false
+    @max_length = nil
+    @capture_rescue = nil
+    @skip_list = nil
+    @capture_events = nil
+    @debug = nil
+    @output_format = nil
+    @eligible_for_capture = nil
+    @original_global_variables = nil
+    @trace = nil
+    @override_messages = nil
+    @rspec_failure_message_loaded = nil
 
-    def max_length(value = nil)
-      if value.nil?
-        @max_length ||= DEFAULT_MAX_LENGTH
-      else
-        @max_length = value
-      end
-      @max_length
+    # Override the writer methods to ensure thread safety
+    def enabled=(val)
+      mutex.synchronize { @enabled = val }
     end
 
-    def capture_rescue(value = nil)
-      if value.nil?
-        @capture_rescue = @capture_rescue.nil? ? false : @capture_rescue
-      else
-        @capture_rescue = value
+    def enabled
+      mutex.synchronize { @enabled }
+    end
+
+    def capture_rescue=(val)
+      mutex.synchronize { @capture_rescue = val }
+    end
+
+    def capture_rescue
+      mutex.synchronize { @capture_rescue.nil? ? false : @capture_rescue }
+    end
+
+    def max_length(value = nil)
+      mutex.synchronize do
+        if value.nil?
+          @max_length ||= DEFAULT_MAX_LENGTH
+        else
+          @max_length = value
+        end
+        @max_length
       end
-      @capture_rescue
     end
 
     def skip_list
-      @skip_list ||= DEFAULT_SKIP_LIST.dup
+      mutex.synchronize do
+        @skip_list ||= DEFAULT_SKIP_LIST.dup
+      end
     end
 
-    # takes an exception and bindings, calculates the variables message
-    # and modifies the exceptions .message to display the variables
     def override_exception_message(exception, binding_or_bindings)
-      # Ensure binding_or_bindings is always an array for compatibility
       return nil unless exception
       rspec_binding = !(binding_or_bindings.nil? || binding_or_bindings.empty?)
       exception_binding = (exception.binding_infos.length > 0)
       has_message = !(exception.respond_to?(:unaltered_message))
       return nil unless (rspec_binding || exception_binding) && has_message
+
       variable_str = EnhancedErrors.format(binding_or_bindings)
       message_str = exception.message
       if exception.respond_to?(:captured_variables) && !message_str.include?(exception.captured_variables)
@@ -124,128 +150,111 @@ class EnhancedErrors
     end
 
     def add_to_skip_list(*vars)
-      skip_list.merge(vars)
+      mutex.synchronize do
+        sl = skip_list
+        sl.merge(vars)
+      end
     end
 
     def enhance_exceptions!(enabled: true, debug: false, capture_events: nil, override_messages: false, **options, &block)
-      @output_format = nil
-      @eligible_for_capture = nil
-      @original_global_variables = nil
-      @override_messages = override_messages
-
-      @trace&.disable
-      if !enabled
+      mutex.synchronize do
+        @output_format = nil
+        @eligible_for_capture = nil
         @original_global_variables = nil
-        @enabled = false
-      else
-        # if there's an old one, disable it before replacing it
-        # this seems to actually matter, although it seems like it
-        # shouldn't
+        @override_messages = override_messages
 
-        @enabled = true
-        @debug = debug
-        @original_global_variables = global_variables if @debug
+        @trace&.disable
+        if !enabled
+          @original_global_variables = nil
+          @enabled = false
+        else
+          @enabled = true
+          @debug = debug
+          @original_global_variables = global_variables if @debug
 
-        options.each do |key, value|
-          setter_method = "#{key}="
-          if respond_to?(setter_method)
-            send(setter_method, value)
-          elsif respond_to?(key)
-            send(key, value)
-          else
-            # Ignore unknown options
+          options.each do |key, value|
+            setter_method = "#{key}="
+            if respond_to?(setter_method)
+              send(setter_method, value)
+            elsif respond_to?(key)
+              send(key, value)
+            end
           end
+
+          @config_block = block_given? ? block : nil
+          instance_eval(&@config_block) if @config_block
+
+          validate_and_set_capture_events(capture_events)
+
+          events = @capture_events ? @capture_events.to_a : default_capture_events
+          @trace = TracePoint.new(*events) do |tp|
+            handle_tracepoint_event(tp)
+          end
+
+          @trace.enable
         end
-
-        @config_block = block_given? ? block : nil
-        instance_eval(&@config_block) if @config_block
-
-        validate_and_set_capture_events(capture_events)
-
-        events = @capture_events ? @capture_events.to_a : default_capture_events
-        @trace = TracePoint.new(*events) do |tp|
-          handle_tracepoint_event(tp)
-        end
-
-        @trace.enable
       end
     end
 
     def safe_prepend_module(target_class, mod)
-      if defined?(target_class) && target_class.is_a?(Module)
-        target_class.prepend(mod)
-        true
-      else
-        false
+      mutex.synchronize do
+        if defined?(target_class) && target_class.is_a?(Module)
+          target_class.prepend(mod)
+          true
+        else
+          false
+        end
       end
     end
 
     def safely_prepend_rspec_custom_failure_message
-      return if @rspec_failure_message_loaded
-      if defined?(RSpec::Core::Example) && !RSpec::Core::Example < Enhanced::Integrations::RSpecErrorFailureMessage
-        RSpec::Core::Example.prepend(Enhanced::Integrations::RSpecErrorFailureMessage)
-        @rspec_failure_message_loaded = true
+      mutex.synchronize do
+        return if @rspec_failure_message_loaded
+        if defined?(RSpec::Core::Example) && !RSpec::Core::Example < Enhanced::Integrations::RSpecErrorFailureMessage
+          RSpec::Core::Example.prepend(Enhanced::Integrations::RSpecErrorFailureMessage)
+          @rspec_failure_message_loaded = true
+        end
       end
     rescue => e
       puts "Failed to prepend RSpec custom failure message: #{e.message}"
     end
 
-    # Note: Differences between the rspec capture, and regular ehancement (EnhancedErrors.enhance_exceptions):
-    # We do modify the error message for RSpec capture, however we do it at
-    # the last minute, just as it is going to be printed. This solves some potential problems
-    # 1- Assertions that bank on a certain exact error message pass. Note, though
-    # that if you assert on the variable string being in the exception, when
-    # this type of decoration is running, the string isn't there. Not that you should
-    # be doing that anyway.
-    # 2 - If you do anything with storing exception messages in DB records or anywhere
-    # that is space-limited, or privacy concerning, these rspec message changes only happen in
-    # the context of RSpec, not in your app itself while it is running.
     def start_rspec_binding_capture
-      @rspec_example_binding = nil
-      @capture_next_binding = false
+      mutex.synchronize do
+        @rspec_example_binding = nil
+        @capture_next_binding = false
+        @enabled = true
+        @rspec_tracepoint&.disable
 
-      @enabled = true
-
-      # In the Exception binding infos, I observed that re-setting
-      # the tracepoint without disabling it seemed to accumulate traces
-      # in the test suite where things are disabled and re-enabled often.
-      @rspec_tracepoint&.disable
-
-      @rspec_tracepoint = TracePoint.new(:raise, :b_return) do |tp|
-        # This is super-kluge-y and should be replaced with... something TBD
-        # only look at block returns once we have seen an ExpectationNotMetError
-
-
-        case tp.event
-        when :b_return
-          # only active if we are capturing the next binding
-          next unless @capture_next_binding && @rspec_example_binding.nil?
-          # early easy checks to nope out of the object name and other checks
-          if @capture_next_binding && tp.method_id.nil? && !(tp.path.include?('rspec')) && tp.path.end_with?('_spec.rb')
-            # fixes cases where class and name are screwed up or overridden
-            if determine_object_name(tp) =~ RSPEC_EXAMPLE_REGEXP
-              @rspec_example_binding = tp.binding
+        @rspec_tracepoint = TracePoint.new(:raise, :b_return) do |tp|
+          case tp.event
+          when :b_return
+            next unless @capture_next_binding && @rspec_example_binding.nil?
+            if @capture_next_binding && tp.method_id.nil? && !(tp.path.include?('rspec')) && tp.path.end_with?('_spec.rb')
+              if determine_object_name(tp) =~ RSPEC_EXAMPLE_REGEXP
+                @rspec_example_binding = tp.binding
+              end
+            end
+          when :raise
+            if tp.raised_exception.class.name == 'RSpec::Expectations::ExpectationNotMetError'
+              @capture_next_binding ||= true
+            else
+              handle_tracepoint_event(tp)
             end
           end
-        when :raise
-          # turn on capture of next binding
-          if tp.raised_exception.class.name == 'RSpec::Expectations::ExpectationNotMetError'
-            @capture_next_binding ||= true
-          else
-            handle_tracepoint_event(tp)
-          end
         end
+        @rspec_tracepoint.enable
       end
-
-      @rspec_tracepoint.enable
     end
 
     def stop_rspec_binding_capture
-      @rspec_tracepoint&.disable
-      binding_info = convert_binding_to_binding_info(@rspec_example_binding) if @rspec_example_binding
-      @capture_next_binding = false
-      @rspec_example_binding = nil
-      binding_info
+      mutex.synchronize do
+        @rspec_tracepoint&.disable
+        binding_info = convert_binding_to_binding_info(@rspec_example_binding) if @rspec_example_binding
+        @capture_next_binding = false
+        @rspec_example_binding = nil
+        binding_info
+      end
     end
 
     def convert_binding_to_binding_info(b, capture_let_variables: true)
@@ -258,7 +267,6 @@ class EnhancedErrors
       instance_vars = receiver.instance_variables
       instances = instance_vars.map { |var| [var, safe_instance_variable_get(receiver, var)] }.to_h
 
-      # Capture let variables only for RSpec captures
       lets = {}
       if capture_let_variables && instance_vars.include?(:@__memoized)
         outer_memoized = receiver.instance_variable_get(:@__memoized)
@@ -287,59 +295,66 @@ class EnhancedErrors
         capture_event: 'RSpecContext'
       }
 
-      # Apply skip list to remove @__memoized and @__inspect_output from output
-      # but only after extracting let variables.
       default_on_capture(binding_info)
     end
 
     def eligible_for_capture(&block)
-      if block_given?
-        @eligible_for_capture = block
-      else
-        @eligible_for_capture ||= method(:default_eligible_for_capture)
+      mutex.synchronize do
+        if block_given?
+          @eligible_for_capture = block
+        else
+          @eligible_for_capture ||= method(:default_eligible_for_capture)
+        end
       end
     end
 
     def on_capture(&block)
-      if block_given?
-        @on_capture_hook = block
-      else
-        @on_capture_hook ||= method(:default_on_capture)
+      mutex.synchronize do
+        if block_given?
+          @on_capture_hook = block
+        else
+          @on_capture_hook ||= method(:default_on_capture)
+        end
       end
     end
 
     def on_capture=(value)
-      self.on_capture_hook = value
+      mutex.synchronize do
+        @on_capture_hook = value
+      end
     end
 
     def on_format(&block)
-      if block_given?
-        @on_format_hook = block
-      else
-        @on_format_hook ||= method(:default_on_format)
+      mutex.synchronize do
+        if block_given?
+          @on_format_hook = block
+        else
+          @on_format_hook ||= method(:default_on_format)
+        end
       end
     end
 
     def on_format=(value)
-      @on_format_hook = value
+      mutex.synchronize do
+        @on_format_hook = value
+      end
     end
 
     def format(captured_binding_infos = [], output_format = get_default_format_for_environment)
       return '' if captured_binding_infos.nil? || captured_binding_infos.empty?
 
-      # If captured_binding_infos is already an array, use it directly; otherwise, wrap it in an array.
-      binding_infos = captured_binding_infos.is_a?(Array) ? captured_binding_infos : [captured_binding_infos]
+      result = binding_infos_array_to_string(captured_binding_infos, output_format)
 
-      result = binding_infos_array_to_string(binding_infos, output_format)
-
-      if @on_format_hook
-        begin
-          result = @on_format_hook.call(result)
-        rescue
-          result = ''
+      mutex.synchronize do
+        if @on_format_hook
+          begin
+            result = @on_format_hook.call(result)
+          rescue
+            result = ''
+          end
+        else
+          result = default_on_format(result)
         end
-      else
-        result = default_on_format(result)
       end
 
       result
@@ -348,48 +363,55 @@ class EnhancedErrors
     def binding_infos_array_to_string(captured_bindings, format = :terminal)
       return '' if captured_bindings.nil? || captured_bindings.empty?
       captured_bindings = [captured_bindings] unless captured_bindings.is_a?(Array)
-      Colors.enabled = format == :terminal
+      Colors.enabled = (format == :terminal)
       formatted_bindings = captured_bindings.to_a.map { |binding_info| binding_info_string(binding_info) }
       format == :json ? JSON.pretty_generate(captured_bindings) : "\n#{formatted_bindings.join("\n")}"
     end
 
     def get_default_format_for_environment
-      return @output_format unless @output_format.nil?
-      env = ENV['RAILS_ENV'] || ENV['RACK_ENV'] || 'development'
-      @output_format = case env
-                       when 'development', 'test'
-                         if running_in_ci?
-                           :plaintext
+      mutex.synchronize do
+        return @output_format unless @output_format.nil?
+        env = ENV['RAILS_ENV'] || ENV['RACK_ENV'] || 'development'
+        @output_format = case env
+                         when 'development', 'test'
+                           if running_in_ci?
+                             :plaintext
+                           else
+                             :terminal
+                           end
+                         when 'production'
+                           :json
                          else
                            :terminal
                          end
-                       when 'production'
-                         :json
-                       else
-                         :terminal
-                       end
+      end
     end
 
     def running_in_ci?
-      return @running_in_ci if defined?(@running_in_ci)
-      ci_env_vars = {
-        'CI' => ENV['CI'],
-        'JENKINS' => ENV['JENKINS'],
-        'GITHUB_ACTIONS' => ENV['GITHUB_ACTIONS'],
-        'CIRCLECI' => ENV['CIRCLECI'],
-        'TRAVIS' => ENV['TRAVIS'],
-        'APPVEYOR' => ENV['APPVEYOR'],
-        'GITLAB_CI' => ENV['GITLAB_CI']
-      }
-      @running_in_ci = ci_env_vars.any? { |_, value| value.to_s.downcase == 'true' }
+      mutex.synchronize do
+        return @running_in_ci if defined?(@running_in_ci)
+        ci_env_vars = {
+          'CI' => ENV['CI'],
+          'JENKINS' => ENV['JENKINS'],
+          'GITHUB_ACTIONS' => ENV['GITHUB_ACTIONS'],
+          'CIRCLECI' => ENV['CIRCLECI'],
+          'TRAVIS' => ENV['TRAVIS'],
+          'APPVEYOR' => ENV['APPVEYOR'],
+          'GITLAB_CI' => ENV['GITLAB_CI']
+        }
+        @running_in_ci = ci_env_vars.any? { |_, value| value.to_s.downcase == 'true' }
+      end
     end
 
     def apply_skip_list(binding_info)
-      variables = binding_info[:variables]
-      variables[:instances]&.reject! { |var, _| skip_list.include?(var) || (var.to_s.start_with?('@_') && !@debug) }
-      variables[:locals]&.reject! { |var, _| skip_list.include?(var) }
-      return binding_info unless @debug
-      variables[:globals]&.reject! { |var, _| skip_list.include?(var) }
+      mutex.synchronize do
+        variables = binding_info[:variables]
+        variables[:instances]&.reject! { |var, _| skip_list.include?(var) || (var.to_s.start_with?('@_') && !@debug) }
+        variables[:locals]&.reject! { |var, _| skip_list.include?(var) }
+        if @debug
+          variables[:globals]&.reject! { |var, _| skip_list.include?(var) }
+        end
+      end
       binding_info
     end
 
@@ -424,7 +446,6 @@ class EnhancedErrors
         result += "\n#{Colors.green('Instances:')}\n#{variable_description(instance_vars_to_display)}"
       end
 
-      # Display let variables for RSpec captures
       if variables[:lets] && !variables[:lets].empty?
         result += "\n#{Colors.green('Let Variables:')}\n#{variable_description(variables[:lets])}"
       end
@@ -433,9 +454,13 @@ class EnhancedErrors
         result += "\n#{Colors.green('Globals:')}\n#{variable_description(variables[:globals])}"
       end
 
-      if result.length > max_length
-        result = result[0...max_length] + "... (truncated)"
+      mutex.synchronize do
+        max_len = @max_length || DEFAULT_MAX_LENGTH
+        if result.length > max_len
+          result = result[0...max_len] + "... (truncated)"
+        end
       end
+
       result + "\n"
     rescue => e
       puts "#{e.message}"
@@ -445,12 +470,16 @@ class EnhancedErrors
     private
 
     def handle_tracepoint_event(tp)
-      return unless @enabled
+      enabled_local = mutex.synchronize { @enabled }
+      return unless enabled_local
       return if Thread.current[:enhanced_errors_processing] || Thread.current[:on_capture] || ignored_exception?(tp.raised_exception)
       Thread.current[:enhanced_errors_processing] = true
       exception = tp.raised_exception
 
-      capture_me = !exception.frozen? && EnhancedErrors.eligible_for_capture.call(exception)
+      capture_me = mutex.synchronize do
+        !exception.frozen? && (@eligible_for_capture || method(:default_eligible_for_capture)).call(exception)
+      end
+
       unless capture_me
         Thread.current[:enhanced_errors_processing] = false
         return
@@ -472,15 +501,17 @@ class EnhancedErrors
         [var, safe_instance_variable_get(binding_context.receiver, var)]
       }.to_h
 
-      # No let variables for exceptions
       lets = {}
 
       globals = {}
-      if @debug
-        globals = (global_variables - @original_global_variables.to_a).map { |var|
-          [var, get_global_variable_value(var)]
-        }.to_h
+      mutex.synchronize do
+        if @debug
+          globals = (global_variables - @original_global_variables.to_a).map { |var|
+            [var, get_global_variable_value(var)]
+          }.to_h
+        end
       end
+
       capture_event = safe_to_s(tp.event)
       location = "#{safe_to_s(tp.path)}:#{safe_to_s(tp.lineno)}"
       binding_info = {
@@ -500,10 +531,12 @@ class EnhancedErrors
       }
 
       binding_info = default_on_capture(binding_info)
-      if on_capture_hook
+      on_capture_hook_local = mutex.synchronize { @on_capture_hook }
+
+      if on_capture_hook_local
         begin
           Thread.current[:on_capture] = true
-          binding_info = on_capture_hook.call(binding_info)
+          binding_info = on_capture_hook_local.call(binding_info)
         rescue
           binding_info = nil
         ensure
@@ -514,17 +547,17 @@ class EnhancedErrors
       if binding_info
         binding_info = validate_binding_format(binding_info)
         if binding_info && exception.binding_infos.length >= MAX_BINDING_INFOS
-          # delete from the middle of the array as the ends are most interesting
           exception.binding_infos.delete_at(MAX_BINDING_INFOS / 2.round)
         end
         if binding_info
           exception.binding_infos << binding_info
-          override_exception_message(exception, exception.binding_infos) if @override_messages
+          mutex.synchronize do
+            override_exception_message(exception, exception.binding_infos) if @override_messages
+          end
         end
       end
-    rescue =>e
+    rescue
       # Avoid raising exceptions here
-
     ensure
       Thread.current[:enhanced_errors_processing] = false
     end
@@ -534,52 +567,55 @@ class EnhancedErrors
     end
 
     def test_name
-      if defined?(RSpec)
-        RSpec&.current_example&.full_description
+      begin
+        defined?(RSpec) ? RSpec&.current_example&.full_description : nil
+      rescue
+        nil
       end
-    rescue
-      nil
     end
 
     def default_capture_events
-      return @default_capture_events if @default_capture_events
-      events = [:raise]
-      if capture_rescue && Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3.0')
-        events << :rescue
+      mutex.synchronize do
+        return @default_capture_events if @default_capture_events
+        events = [:raise]
+        if capture_rescue && Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3.0')
+          events << :rescue
+        end
+        @default_capture_events = events
       end
-      @default_capture_events = events
     end
 
     def validate_and_set_capture_events(capture_events)
-      if capture_events.nil?
-        @capture_events = default_capture_events
-        return
-      end
+      mutex.synchronize do
+        if capture_events.nil?
+          @capture_events = Set.new(default_capture_events)
+          return
+        end
 
-      unless valid_capture_events?(capture_events)
-        puts "EnhancedErrors: Invalid capture_events provided. Falling back to defaults."
-        @capture_events = default_capture_events
-        return
-      end
+        unless valid_capture_events?(capture_events)
+          puts "EnhancedErrors: Invalid capture_events provided. Falling back to defaults."
+          @capture_events = Set.new(default_capture_events)
+          return
+        end
 
-      if capture_events.include?(:rescue) && Gem::Version.new(RUBY_VERSION) < Gem::Version.new('3.3.0')
-        puts "EnhancedErrors: Warning: :rescue capture_event not supported below Ruby 3.3.0, ignoring it."
-        capture_events = capture_events - [:rescue]
-      end
+        if capture_events.include?(:rescue) && Gem::Version.new(RUBY_VERSION) < Gem::Version.new('3.3.0')
+          puts "EnhancedErrors: Warning: :rescue capture_event not supported below Ruby 3.3.0, ignoring it."
+          capture_events = capture_events - [:rescue]
+        end
 
-      if capture_events.empty?
-        puts "No valid capture_events provided to EnhancedErrors.enhance_exceptions! Falling back to defaults."
-        @capture_events = default_capture_events
-        return
-      end
+        if capture_events.empty?
+          puts "No valid capture_events provided to EnhancedErrors.enhance_exceptions! Falling back to defaults."
+          @capture_events = Set.new(default_capture_events)
+          return
+        end
 
-      @capture_events = capture_events.to_set
+        @capture_events = Set.new(capture_events)
+      end
     end
 
     def valid_capture_events?(capture_events)
-      return false unless capture_events.is_a?(Array) || capture_events.is_a?(Set)
-      valid_types = [:raise, :rescue].to_set
-      capture_events.to_set.subset?(valid_types)
+      (capture_events.is_a?(Array) || capture_events.is_a?(Set)) &&
+        capture_events.to_set.subset?([:raise, :rescue].to_set)
     end
 
     def extract_arguments(tp, method_name)
@@ -604,14 +640,7 @@ class EnhancedErrors
 
     def determine_object_name(tp, method_name = '')
       begin
-        # These tricks are used to get around the fact that `tp.self` can be a class that is
-        # wired up with method_missing where every direct call alters the class. This is true
-        # on certain builders or config objects and caused problems.
-
-        # Directly bind and call the `class` method to avoid triggering `method_missing`
         self_class = Object.instance_method(:class).bind(tp.self).call
-
-        # Similarly, bind and call `singleton_class` safely
         singleton_class = Object.instance_method(:singleton_class).bind(tp.self).call
 
         if self_class && tp.defined_class == singleton_class
@@ -623,7 +652,7 @@ class EnhancedErrors
           method_suffix = method_name && !method_name.empty? ? "##{method_name}" : ""
           "#{object_class_name}#{method_suffix}"
         end
-      rescue Exception => e
+      rescue
         '[ErrorGettingName]'
       end
     end
@@ -665,8 +694,10 @@ class EnhancedErrors
     end
 
     def awesome_print_available?
-      return @awesome_print_available unless @awesome_print_available.nil?
-      @awesome_print_available = defined?(AwesomePrint)
+      mutex.synchronize do
+        return @awesome_print_available unless @awesome_print_available.nil?
+        @awesome_print_available = defined?(AwesomePrint)
+      end
     end
 
     def safe_inspect(variable)
@@ -708,7 +739,7 @@ class EnhancedErrors
     end
 
     def default_on_capture(binding_info)
-      EnhancedErrors.apply_skip_list(binding_info)
+      apply_skip_list(binding_info)
     end
 
     def default_eligible_for_capture(exception)
