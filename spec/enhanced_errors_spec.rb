@@ -13,6 +13,18 @@ class TestClass
   end
 end
 
+def configure_rspec
+  RSpec.configure do |config|
+    config.before(:example) do |_example|
+      EnhancedErrors.start_rspec_binding_capture
+    end
+
+    config.after(:example) do |example|
+      EnhancedErrors.override_exception_message(example.exception, EnhancedErrors.stop_rspec_binding_capture)
+    end
+  end
+end
+
 RSpec.describe EnhancedErrors do
   before(:each) do
     # Enable exception enhancements and RSpec enhancements so let variables are captured
@@ -156,10 +168,10 @@ RSpec.describe EnhancedErrors do
           context 'with Ruby version >= 3.3.0' do
             before { stub_const('RUBY_VERSION', '3.3.0') }
 
-            it 'sets @capture_events to Set containing :raise' do
+            it 'sets @capture_events containing :raise' do
               EnhancedErrors.capture_rescue = false
               EnhancedErrors.send(:validate_and_set_capture_events, nil)
-              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise]))
+              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise])
             end
           end
 
@@ -168,7 +180,7 @@ RSpec.describe EnhancedErrors do
 
             it 'sets @capture_events to Set containing :raise only' do
               EnhancedErrors.send(:validate_and_set_capture_events, nil)
-              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise]))
+              expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise])
             end
           end
         end
@@ -176,19 +188,19 @@ RSpec.describe EnhancedErrors do
         context 'when capture_events is provided as an array' do
           it 'captures only :raise' do
             EnhancedErrors.send(:validate_and_set_capture_events, [:raise])
-            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise]))
+            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise])
           end
 
           it 'captures only :rescue with Ruby >= 3.3.0' do
             stub_const('RUBY_VERSION', '3.3.0')
             EnhancedErrors.send(:validate_and_set_capture_events, [:rescue])
-            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:rescue]))
+            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:rescue])
           end
 
           it 'captures both :raise and :rescue with Ruby >= 3.3.0' do
             stub_const('RUBY_VERSION', '3.3.0')
             EnhancedErrors.send(:validate_and_set_capture_events, [:raise, :rescue])
-            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise, :rescue]))
+            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise, :rescue])
           end
 
           it 'ignores :rescue with Ruby < 3.3.0 and prints a warning' do
@@ -197,7 +209,7 @@ RSpec.describe EnhancedErrors do
               EnhancedErrors.send(:validate_and_set_capture_events, [:raise, :rescue])
             }.to output(/EnhancedErrors: Warning: :rescue capture_event not supported below Ruby 3.3.0, ignoring it./).to_stdout
 
-            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq(Set.new([:raise]))
+            expect(EnhancedErrors.instance_variable_get(:@capture_events)).to eq([:raise])
           end
         end
       end
@@ -517,7 +529,7 @@ RSpec.describe EnhancedErrors do
             # Exception is rescued here
           end
 
-
+          expect(EnhancedErrors.capture_rescue).to be_truthy
           rescue_info = captured_binding_infos.find { |info| info[:capture_event] == 'rescue' }
           expect(rescue_info).not_to be_nil
           expect(rescue_info[:capture_event]).to eq('rescue')
@@ -614,7 +626,7 @@ RSpec.describe EnhancedErrors do
         EnhancedErrors.enhance_exceptions!(enabled: false)
         disabled_trace = EnhancedErrors.trace
         # we have switched to cleaning it up, as it seems safer
-        expect(disabled_trace.enabled?).to be_falsey
+        expect(disabled_trace && disabled_trace.enabled).to be_falsey
       end
 
       it 'caps max binding_infos to track at 10' do
@@ -780,6 +792,7 @@ RSpec.describe EnhancedErrors do
       end
     end
 
+
     describe 'Edge cases with unusual exceptions and objects' do
       context 'exceptions raised in BasicObject instances' do
         it 'handles exceptions raised in BasicObject instances without methods' do
@@ -867,5 +880,119 @@ RSpec.describe EnhancedErrors do
         end
       end
     end
+  end
+
+
+
+end
+
+
+RSpec.describe EnhancedErrors, 'max_capture_events functionality' do
+  before(:each) do
+    # Fully reset the environment before each test
+    EnhancedErrors.enhance_exceptions!(enabled: false)
+    EnhancedErrors.reset_capture_events_count
+    EnhancedErrors.max_capture_events = -1
+    EnhancedErrors.trace = nil
+
+    # Re-enable with a restricted eligible_for_capture
+    EnhancedErrors.enhance_exceptions!(enabled: true, override_messages: false) do
+      # Only capture exceptions that start with known test phrases to avoid interference
+      eligible_for_capture do |ex|
+        ex.is_a?(StandardError) && ex.message =~ /^(Test|First|Second|Third|Hit|Now capturing|Exception)/
+      end
+    end
+  end
+
+  after(:each) do
+    # Disable after each test to avoid state leaking into subsequent tests
+    EnhancedErrors.enhance_exceptions!(enabled: false)
+    EnhancedErrors.reset_capture_events_count
+    EnhancedErrors.max_capture_events = -1
+    EnhancedErrors.trace = nil
+  end
+
+  it 'disables capturing after exceeding the max capture limit' do
+    EnhancedErrors.max_capture_events = 2
+    expect(EnhancedErrors.capture_events_count).to eq(0)
+
+    # Raise first exception
+    expect {
+      raise 'First exception'
+    }.to raise_error(StandardError)
+    expect(EnhancedErrors.capture_events_count).to eq(1)
+
+    # Raise second exception
+    expect {
+      raise 'Second exception'
+    }.to raise_error(StandardError)
+    expect(EnhancedErrors.capture_events_count).to eq(2)
+
+    # Raise third exception - should exceed limit and disable capturing
+    expect {
+      raise 'Third exception'
+    }.to raise_error(StandardError)
+
+    # Capturing should be disabled now, no increment
+    expect(EnhancedErrors.capture_events_count).to eq(2)
+    expect(EnhancedErrors.enabled).to be false
+  end
+
+  it 'does not increase capture_events_count once disabled' do
+    EnhancedErrors.max_capture_events = 1
+
+    # Hit the limit
+    expect {
+      raise 'Test exception'
+    }.to raise_error(StandardError)
+    expect(EnhancedErrors.capture_events_count).to eq(1)
+    expect(EnhancedErrors.enabled).to be false
+
+    # Another exception should not increment the count
+    expect {
+      raise 'Test exception'
+    }.to raise_error(StandardError)
+    expect(EnhancedErrors.capture_events_count).to eq(1)
+  end
+
+  it 'resets capture_events_count to 0 and allows capturing again' do
+    EnhancedErrors.max_capture_events = 1
+
+    # Hit the limit
+    expect {
+      raise 'Hit the limit'
+    }.to raise_error(StandardError)
+    expect(EnhancedErrors.capture_events_count).to eq(1)
+    expect(EnhancedErrors.enabled).to be false
+
+    # Reset the count
+    EnhancedErrors.reset_capture_events_count
+    expect(EnhancedErrors.capture_events_count).to eq(0)
+    EnhancedErrors.max_capture_events = 1
+
+    # Now we should be able to capture again
+    expect {
+      raise 'Now capturing again'
+    }.to raise_error(StandardError)
+    expect(EnhancedErrors.capture_events_count).to eq(1)
+    # Should be disabled again after hitting the limit
+    expect(EnhancedErrors.enabled).to be false
+  end
+
+  it 'allows unlimited capturing when max_capture_events = -1' do
+    EnhancedErrors.reset_capture_events_count
+    expect(EnhancedErrors.capture_events_count).to eq(0)
+
+    # this is doubled as each raise is both an RSpec expectation
+    # failure, and also a StandardError
+    5.times do |i|
+      expect {
+        raise "Exception #{i}"
+      }.to raise_error(StandardError)
+    end
+
+    # With unlimited capturing, count should equal number of captures
+    expect(EnhancedErrors.capture_events_count).to eq(5)
+    expect(EnhancedErrors.enabled).to be true
   end
 end
