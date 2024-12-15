@@ -21,17 +21,14 @@ class EnhancedErrors
       @monitor ||= Monitor.new
     end
 
-    # Adding enabled and capture_rescue to attr_accessor so the tests that expect
-    # EnhancedErrors.enabled and EnhancedErrors.capture_rescue= ... work.
-    attr_accessor :enabled, :capture_rescue, :config_block, :on_capture_hook, :eligible_for_capture, :trace, :override_messages
-    attr_accessor :max_capture_events, :capture_events_count
+    attr_accessor :enabled, :config_block, :on_capture_hook, :eligible_for_capture, :trace, :override_messages
 
     GEMS_REGEX = %r{[\/\\]gems[\/\\]}
     RSPEC_EXAMPLE_REGEXP = /RSpec::ExampleGroups::[A-Z0-9]+.*/
     DEFAULT_MAX_LENGTH = 2000
     MAX_BINDING_INFOS = 3
 
-    RSPEC_SKIP_LIST = Set.new([
+    RSPEC_SKIP_LIST = [
                                 :@__inspect_output,
                                 :@__memoized,
                                 :@assertion_delegator,
@@ -48,9 +45,9 @@ class EnhancedErrors
                                 :@loaded_fixtures,
                                 :@matcher_definitions,
                                 :@saved_pool_configs
-                              ]).freeze
+                              ].freeze
 
-    RAILS_SKIP_LIST = Set.new([
+    RAILS_SKIP_LIST = [
                                 :@new_record,
                                 :@attributes,
                                 :@association_cache,
@@ -82,9 +79,11 @@ class EnhancedErrors
                                 :@routes,
                                 :@strict_loading,
                                 :@strict_loading_mode
-                              ]).freeze
+                              ].freeze
 
-    DEFAULT_SKIP_LIST = (RAILS_SKIP_LIST + RSPEC_SKIP_LIST).freeze
+    MINITEST_SKIP_LIST = [:@NAME, :@failures, :@time].freeze
+
+    DEFAULT_SKIP_LIST = (RAILS_SKIP_LIST + RSPEC_SKIP_LIST + MINITEST_SKIP_LIST)
 
     @enabled = false
     @max_length = nil
@@ -99,10 +98,11 @@ class EnhancedErrors
     @override_messages = nil
     @rspec_failure_message_loaded = nil
 
+    # Default values
     @max_capture_events = -1   # -1 means no limit
     @capture_events_count = 0
 
-    # Override the writer methods to ensure thread safety
+    # Thread-safe getters and setters
     def enabled=(val)
       mutex.synchronize { @enabled = val }
     end
@@ -116,7 +116,55 @@ class EnhancedErrors
     end
 
     def capture_rescue
-      mutex.synchronize { @capture_rescue.nil? ? false : @capture_rescue }
+      mutex.synchronize {  @capture_rescue }
+    end
+
+    def capture_events_count
+      mutex.synchronize { @capture_events_count }
+    end
+
+    def capture_events_count=(val)
+      mutex.synchronize { @capture_events_count = val }
+    end
+
+    def max_capture_events
+      mutex.synchronize { @max_capture_events }
+    end
+
+    def max_capture_events=(value)
+      mutex.synchronize do
+        @max_capture_events = value
+        if @max_capture_events == 0
+          # Disable capturing
+          if @enabled
+            puts "EnhancedErrors: max_capture_events set to 0, disabling capturing."
+            @enabled = false
+            @trace&.disable
+            @rspec_tracepoint&.disable
+            @minitest_trace&.disable
+          end
+        end
+      end
+    end
+
+    def increment_capture_events_count
+      mutex.synchronize do
+        @capture_events_count += 1
+        # Check if we've hit the limit
+        if @max_capture_events > 0 && @capture_events_count >= @max_capture_events
+          # puts "EnhancedErrors: max_capture_events limit (#{@max_capture_events}) reached, disabling capturing."
+          @enabled = false
+        end
+      end
+    end
+
+    def reset_capture_events_count
+      mutex.synchronize do
+        @capture_events_count = 0
+        @enabled = true
+        @rspec_tracepoint.enable if @rspec_tracepoint
+        @trace.enable if @trace
+      end
     end
 
     def max_length(value = nil)
@@ -132,7 +180,7 @@ class EnhancedErrors
 
     def skip_list
       mutex.synchronize do
-        @skip_list ||= DEFAULT_SKIP_LIST.dup
+        @skip_list ||= DEFAULT_SKIP_LIST
       end
     end
 
@@ -157,19 +205,26 @@ class EnhancedErrors
 
     def add_to_skip_list(*vars)
       mutex.synchronize do
-        sl = skip_list
-        sl.merge(vars)
+        @skip_list.concat(vars)
       end
     end
 
     def enhance_exceptions!(enabled: true, debug: false, capture_events: nil, override_messages: false, **options, &block)
       mutex.synchronize do
+        @trace&.disable
+        @trace = nil
+
         @output_format = nil
         @eligible_for_capture = nil
         @original_global_variables = nil
         @override_messages = override_messages
 
-        @trace&.disable
+        # Ensure these are not nil
+        @max_capture_events = -1 if @max_capture_events.nil?
+        @capture_events_count = 0
+
+        @rspec_failure_message_loaded = true
+
         if !enabled
           @original_global_variables = nil
           @enabled = false
@@ -200,16 +255,15 @@ class EnhancedErrors
           return
         end
 
-        # If previously disabled due to limit and now conditions changed:
-        reenable_if_needed
-
         events = @capture_events ? @capture_events.to_a : default_capture_events
         @trace = TracePoint.new(*events) do |tp|
           handle_tracepoint_event(tp)
         end
 
         # Only enable trace if still enabled and not limited
-        @trace.enable if @enabled && (@max_capture_events == -1 || @capture_events_count < @max_capture_events)
+        if @enabled && (@max_capture_events == -1 || @capture_events_count < @max_capture_events)
+          @trace.enable
+        end
       end
     end
 
@@ -236,23 +290,46 @@ class EnhancedErrors
       puts "Failed to prepend RSpec custom failure message: #{e.message}"
     end
 
+    def is_a_minitest?(klass)
+      klass.ancestors.include?(Minitest::Test) && klass.name != 'Minitest::Test'
+    end
+
+    def start_minitest_binding_capture
+      mutex.synchronize do
+        @minitest_trace = TracePoint.new(:return) do |tp|
+          next unless tp.method_id.to_s.start_with?('test_') && is_a_minitest?(tp.defined_class)
+          @minitest_test_binding = tp.binding
+        end
+        @minitest_trace.enable
+      end
+    end
+
+    def stop_minitest_binding_capture
+      mutex.synchronize do
+        @minitest_trace&.disable
+        @minitest_trace = nil
+        convert_binding_to_binding_info(@minitest_test_binding) if @minitest_test_binding
+      end
+    end
+
     def start_rspec_binding_capture
       mutex.synchronize do
         @rspec_example_binding = nil
         @capture_next_binding = false
-        @enabled = true
         @rspec_tracepoint&.disable
+        @enabled = true if @enabled.nil?
 
         @rspec_tracepoint = TracePoint.new(:raise, :b_return) do |tp|
-          case tp.event
-          when :b_return
+          # This trickery is to help us identify the anonymous block return we want to grab
+          if tp.event == :b_return
             next unless @capture_next_binding && @rspec_example_binding.nil?
             if @capture_next_binding && tp.method_id.nil? && !(tp.path.include?('rspec')) && tp.path.end_with?('_spec.rb')
               if determine_object_name(tp) =~ RSPEC_EXAMPLE_REGEXP
+                increment_capture_events_count
                 @rspec_example_binding = tp.binding
               end
             end
-          when :raise
+          elsif tp.event == :raise
             if tp.raised_exception.class.name == 'RSpec::Expectations::ExpectationNotMetError'
               @capture_next_binding ||= true
             else
@@ -267,6 +344,7 @@ class EnhancedErrors
     def stop_rspec_binding_capture
       mutex.synchronize do
         @rspec_tracepoint&.disable
+        @rspec_tracepoint = nil
         binding_info = convert_binding_to_binding_info(@rspec_example_binding) if @rspec_example_binding
         @capture_next_binding = false
         @rspec_example_binding = nil
@@ -484,58 +562,14 @@ class EnhancedErrors
       ''
     end
 
-    def reset_capture_events_count
-      mutex.synchronize do
-        @capture_events_count = 0
-        reenable_if_needed
-      end
-    end
-
-    def max_capture_events=(value)
-      mutex.synchronize do
-        @max_capture_events = value
-        # Guard against 0 which means disabled
-        if @max_capture_events == 0
-          # Disable capturing
-          if @enabled
-            puts "EnhancedErrors: max_capture_events set to 0, disabling capturing."
-            @enabled = false
-            @trace&.disable
-          end
-        else
-          # If previously disabled due to hitting a limit and now this limit is relaxed
-          reenable_if_needed
-        end
-      end
-    end
-
     private
 
-    def reenable_if_needed
-      # If we have no limit (-1) or haven't reached the new limit yet, re-enable if disabled due to limit
-      return unless @enabled == true # Only try to re-enable if we are conceptually enabled
-
-      currently_disabled = @trace.nil? || !@trace.enabled?
-      can_capture = (@max_capture_events == -1) || (@capture_events_count < @max_capture_events)
-
-      if can_capture && currently_disabled && @trace
-        puts "EnhancedErrors: re-enabling capturing due to updated max_capture_events."
-        @trace.enable
-      elsif can_capture && @trace.nil? && @enabled
-        # If @trace is nil, we need to set it up again
-        events = @capture_events ? @capture_events.to_a : default_capture_events
-        @trace = TracePoint.new(*events) do |tp|
-          handle_tracepoint_event(tp)
-        end
-        puts "EnhancedErrors: re-enabling capturing due to updated max_capture_events."
-        @trace.enable
-      end
-    end
 
     def handle_tracepoint_event(tp)
-      enabled_local = mutex.synchronize { @enabled }
-      return unless enabled_local
+      # Check enabled outside the synchronized block for speed, but still safe due to re-check inside.
+      return unless mutex.synchronize { @enabled }
       return if Thread.current[:enhanced_errors_processing] || Thread.current[:on_capture] || ignored_exception?(tp.raised_exception)
+
       Thread.current[:enhanced_errors_processing] = true
       exception = tp.raised_exception
 
@@ -616,15 +650,8 @@ class EnhancedErrors
           exception.binding_infos << binding_info
           mutex.synchronize do
             override_exception_message(exception, exception.binding_infos) if @override_messages
-            @capture_events_count += 1
-
-            # Check if we've hit the limit
-            if @max_capture_events > 0 && @capture_events_count >= @max_capture_events
-              puts "EnhancedErrors: max_capture_events limit (#{@max_capture_events}) reached, disabling capturing."
-              @enabled = false
-              @trace&.disable
-            end
           end
+          increment_capture_events_count
         end
       end
     rescue
@@ -647,25 +674,25 @@ class EnhancedErrors
 
     def default_capture_events
       mutex.synchronize do
-        return @default_capture_events if @default_capture_events
         events = [:raise]
-        if capture_rescue && Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3.0')
+        rescue_available = !!(Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3.0'))
+        if capture_rescue && rescue_available
           events << :rescue
         end
-        @default_capture_events = events
+        events
       end
     end
 
     def validate_and_set_capture_events(capture_events)
       mutex.synchronize do
         if capture_events.nil?
-          @capture_events = Set.new(default_capture_events)
+          @capture_events = default_capture_events
           return
         end
 
         unless valid_capture_events?(capture_events)
           puts "EnhancedErrors: Invalid capture_events provided. Falling back to defaults."
-          @capture_events = Set.new(default_capture_events)
+          @capture_events = default_capture_events
           return
         end
 
@@ -676,17 +703,16 @@ class EnhancedErrors
 
         if capture_events.empty?
           puts "No valid capture_events provided to EnhancedErrors.enhance_exceptions! Falling back to defaults."
-          @capture_events = Set.new(default_capture_events)
+          @capture_events = default_capture_events
           return
         end
 
-        @capture_events = Set.new(capture_events)
+        @capture_events = capture_events
       end
     end
 
     def valid_capture_events?(capture_events)
-      (capture_events.is_a?(Array) || capture_events.is_a?(Set)) &&
-        capture_events.to_set.subset?([:raise, :rescue].to_set)
+      capture_events.is_a?(Array) && [:raise, :rescue] && capture_events
     end
 
     def extract_arguments(tp, method_name)

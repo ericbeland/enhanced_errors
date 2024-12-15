@@ -2,88 +2,13 @@
 
 ## Overview
 
-**EnhancedErrors** is a pure Ruby gem that enhances exceptions by capturing variables and their values from the scope where the exception was raised.
+**EnhancedErrors** is a lightweight Ruby gem that enhances exceptions by capturing variables and their values from the scope where the exception was raised.
 
 **EnhancedErrors** leverages Ruby's built-in [TracePoint](https://ruby-doc.org/core-3.1.0/TracePoint.html) feature to provide detailed context for exceptions, making debugging easier without significant performance overhead.
 
-When an exception is raised, EnhancedErrors captures the surrounding context.  There are two main
-approaches to using it--from rspec, or to enhance all exceptions.
+EnhancedErrors captures exception context using either a test-framework integration (RSpec/Minitest) or a global enhancement for runtime exceptions.
 
-The RSpec test-time only approach constrained only to test-time.
-
-# RSpec Setup
-
-The simplest way to get started with EnhancedErrors is to use it for RSpec
-exception capturing. This approach is only active during spec runs and is ideal for CI
-and local testing because it doesn't make any changes that should affect production.
-
-```ruby
-
-RSpec.configure do |config|
-  config.before(:example) do |_example|
-    EnhancedErrors.start_rspec_binding_capture
-  end
-
-  config.after(:example) do |example|
-    EnhancedErrors.override_exception_message(example.exception, EnhancedErrors.stop_rspec_binding_capture)
-  end
-end
-```
-
-<br>
-
-#### Enhanced Errors In Regular, Non-spec Exceptions:
-
-```ruby
-
-require 'enhanced_errors'
-require 'awesome_print' # Optional, for better output
-
-# Enable capturing of variables at exception at raise-time. The .captured_variables method
-# is added to all Exceptions and gets populated with in-scope variables and values on `raise`
-
-EnhancedErrors.enhance_exceptions!
-
-def foo
-  begin
-    myvar = 0
-    @myinstance = 10
-    foo = @myinstance / myvar
-  rescue => e
-    puts e.captured_variables
-  end
-end
-
-foo
-```
-
-
-## Enhancing .message
-
-EnhancedErrors can also append the captured variable description into the Exception's
-.message method output if the override_messages argument is true.
-
-This can be convenient as it lets you capture and diagnose
-the context of totally unanticipated exceptions without modifying all your error handlers.
-
-The downside can be that if you have expectations in your tests/specs
-around exception messages, those may break. Also, if you are doing something like storing the errors
-in a database, they could be *much* longer and that may pose an issue on field lengths.
-
-Ideally, use exception.captured_variables instead.
-
-```ruby
-EnhancedErrors.enhance_exceptions!(override_messages: true)
-```
-
-
-##### Output:
-
-<img src="./doc/images/enhanced-error.png" style="height: 215px; width: 429px;"></img>
-<br>
-
-
-#### Enhanced Errors In Specs:
+### Enhanced Errors In RSpec:
 
 ```ruby
 describe 'sees through' do
@@ -109,7 +34,96 @@ end
 
 
 
-## TODO: Minitest
+The RSpec test-time only approach constrained only to test-time.
+
+### RSpec Setup
+
+Use EnhancedErrors with RSpec for test-specific exception capturing, ideal for CI and local testing without impacting production.
+
+```ruby
+
+RSpec.configure do |config|
+  config.before(:example) do |_example|
+    EnhancedErrors.start_rspec_binding_capture
+  end
+
+  config.after(:example) do |example|
+    EnhancedErrors.override_exception_message(example.exception, EnhancedErrors.stop_rspec_binding_capture)
+  end
+end
+```
+
+<br>
+
+
+## MiniTest Setup
+
+```ruby
+require 'enhanced_errors'
+require 'enhanced/minitest_patch'
+
+# Once the patch is loaded, it should just work!
+
+```
+
+<br>
+
+### Enhanced Errors In Everyday Ruby Exceptions:
+
+```ruby
+
+require 'enhanced_errors'
+require 'awesome_print' # Optional, for better output
+
+# Enable capturing of variables at exception at raise-time. The .captured_variables method
+# is added to all Exceptions and gets populated with in-scope variables and values on `raise`
+
+EnhancedErrors.enhance_exceptions!
+
+def foo
+  begin
+    myvar = 0
+    @myinstance = 10
+    foo = @myinstance / myvar
+  rescue => e
+    puts e.captured_variables
+  end
+end
+
+foo
+```
+
+
+### Enhancing .message
+
+EnhancedErrors can append the captured variable description onto every Exception's
+.message method with
+```ruby
+EnhancedErrors.enhance_exceptions(override_messages: true)
+```
+
+This captures unanticipated exceptions without modifying all your error handlers. 
+This approach can be used to get detailed logs when problems happen in something like a cron-job.
+
+The tradeoff of this approach is that if you have expectations in your tests/specs around 
+exception messages, those may break. Also, if you are doing something like storing the errors
+in a database, they could be *much* longer and that may pose an issue on field lengths.
+Or if you are writing your logs to Datadog, New Relic, Splunk, etc, log messages for 
+errors will be longer, and you should consider what data/PII you are sharing.
+
+Ideally, use exception.captured_variables instead.
+
+```ruby
+EnhancedErrors.enhance_exceptions!(override_messages: true)
+```
+
+
+#### Output:
+
+<img src="./doc/images/enhanced-error.png" style="height: 215px; width: 429px;"></img>
+<br>
+
+
 
 ## Features
 
@@ -123,26 +137,13 @@ end
 - **No dependencies**:  EnhancedErrors does not ___require___ any dependencies--it uses [awesome_print](https://github.com/awesome-print/awesome_print) for nicer output if it is installed and available.
 - **Lightweight**: Minimal performance impact, as tracing is only active during exception raising.
 
-EnhancedErrors has a few big use-cases:
+EnhancedErrors use-cases:
 
-* **Catch Data-driven bugs**. For example, if, while processing a 10 gig file, you get an error, you can't just re-run the code with a debugger.
-You also can't just print out all the data, because it's too big. You want to know what the data was the cause of the error.
-Ideally, without long instrument-re-run-fix loops. If your logging didn't capture the data, normally, you'd be stuck. 
-
-* **Debug** a complex application erroring deep in the stack when you can't tell where the error originates.
-
-* **Reduce MTTR** Reduce mean time to resolution.
-
-* **Faster CI -> Fix loop**. When a bug happens in CI, usually there's a step where you first reproduce it locally.
-  EnhancedErrors can help you skip that step.
-
-* **Faster TDD**. In general, you can skip the add-instrumentation step and jump to the fix. Usually, you won't have to re-run to see an error.
-
-* **Heisenbugs** - bugs that disappear when you try to debug them. EnhancedErrors can help you capture the data that causes the bug before it disappears.
-
-* **Unknown Unknowns** - you can't pre-emptively log variables from failure cases you never imagined.
-
-* **Cron jobs** and **daemons** - when it fails for unknown reasons at 4am, check the log and fix--it probably has what you need. Note that 
+* Catch data-driven bugs without needing re-runs or extensive logging.
+* Debug deep-stack errors and reduce mean time to resolution (MTTR).
+* Handle CI failures faster by skipping reproduction steps.
+* Address elusive "Heisenbugs" by capturing error context preemptively.
+* Debug cron jobs and daemons with rich, failure-specific logs.
 
 ## Installation
 
@@ -179,14 +180,15 @@ EnhancedErrors.enhance_exceptions!(override_messages: true)
 
 ```
 
-The approach above activates the TracePoint to start capturing exceptions and their surrounding context.
-It also overrides the .message to have the variables.
+This captures all exceptions and their surrounding context.
+It also overrides the .message to display the variables.
 
 If modifying your exception handlers is an option, it is better *not* to use
-override_messages: true, but instead just use the exception.captured_variables, which is
-a string describing what was found, that is available regardless. 
+but instead just use the exception.captured_variables, which is
+a string describing what was found. 
 
-Note that a minimalistic approach is taken to generating the string--if no qualifying variables were present, you won't see any message!
+Note: a minimalistic approach is taken to generating the capture string.
+If no qualifying variables were present, you won't see any message additions!
 
 ### Configuration Options
 
@@ -203,9 +205,6 @@ end
 - `add_to_skip_list`: Variables to ignore, as symbols. ex:  :@instance_variable_to_skip, :local_to_skip`
 - `enabled`: Enables or disables the enhancement (default: `true`).
 - `max_length`: Sets the maximum length of the captured_variables string (default: `2500`).
-
-Currently, the first `raise` exception binding is presented. 
-This may be changed in the future to allow more binding data to be presented.
 
 
 ### Environment-Based Defaults
@@ -337,8 +336,8 @@ SystemStackError Psych::BadAlias
 
 While this is close to "Things that don't descend from StandardError", it's not exactly that.
 
-In Info mode, variables starting with @_ are also ignored.
-
+By default, many noisy instance variables are ignored in the default skip list.
+If you want to see every instance variable, you'll need to clear out the skip list.
 
 ### Capture Levels
 
@@ -397,7 +396,6 @@ The captured data is available in .captured_variables, to provide context for de
 * There are benchmarks around Tracepoint in the benchmark folder. Targeted tracepoints
 seem to be very cheap--as in, you can hit them ten thousand+ times a second
 without heavy overhead.
-* 
 
 ## Awesome Print
 
@@ -418,28 +416,30 @@ Why not use:
 
 [binding_of_caller](https://github.com/banister/binding_of_caller) or [Pry](https://github.com/pry/pry) or [better_errors](https://github.com/BetterErrors/better_errors)?
 
-First off, these gems are, I cannot stress this enough, a-m-a-z-i-n-g!!! I use them every day--kudos to their creators and maintainers!
+First off, these gems are a-m-a-z-i-n-g!!! I use them every day--kudos to their creators and maintainers!
 
-This is intended for different use-cases. In sum, the goal of this gem is an every-day driver for __non-interactive__ variable inspection. 
+EnhancedErrors is intended as an every-day driver for __non-interactive__ variable inspection. 
 
-With EnhancedErrors is that I want extra details when I run into a problem I __didn't anticipate ahead of time__.
-To make that work, it has to be able to safely be 'on' all the time, and it has to gather the data in
-a way I naturally will see it without requiring extra preparation I obviously didn't know to do.
+I want extra details when I run into a problem I __didn't anticipate ahead of time__.
+To make that work, it has to be able to safely be 'on' ahead of time, and gather data in
+a way I naturally will retain without requiring extra preparation I obviously didn't know to do.
 
-- That won't interrupt CI, but also, that lets me know what happened without reproduction
-- That could, theoretically, also be fine in production (if data security, redaction, access, and encryption concerns were all addressed--Ok, big
-list, but another option is to selectively enable targeted capture)
+- EnhancedErrors won't interrupt CI, but it lets me know what happened _without_ reproduction steps
+- EnhancedErrors could, theoretically, also be fine in production (if data security, redaction, 
+PII, access, and encryption concerns were all addressed. 
+Big list, but another option is to selectively enable targeted capture.
 - Has decent performance characteristics
 - **Only** becomes active in exception raise/rescue scenarios
 
 This gem could have been implemented using binding_of_caller, or the gem it depends on, [debug_inspector](https://rubygems.org/gems/debug_inspector/versions/1.1.0?locale=en). 
-However, the recommendation is not to use those in production as they use C API extensions. This doesn't. This selectively uses 
-Ruby's TracePoint binding capture very narrowly with no other C API or dependencies, and only to target Exceptions--not to allow universal calls to the prior binding. It doesn't work as a debugger, but that also means it can, with care, operate safely in a narrow scope--becoming active only when exceptions are raised.
+However, the recommendation is not to use those in production as they use C API extensions. This doesn't. 
+EnhancedErrors selectively uses Ruby's TracePoint binding capture very narrowly with no other C API or dependencies, and only to target 
+Exceptions. It operates in a narrow scope--becoming active only when exceptions are raised.
 
 
 ## Performance Considerations
 
-- **Minimal Overhead**: Since TracePoint is only activated during exception raising and rescuing, the performance impact is negligible during normal operation. (Benchmark included)
+- **Small Overhead**: Since TracePoint is only activated during exception raising and rescuing, the performance impact is negligible during normal operation. (Benchmark included)
 
 - **TBD**: Memory considerations. This does capture data when an exception happens. EnhancedErrors hides under the bed when it sees **NoMemoryError**.
 
