@@ -21,7 +21,10 @@ Gem::Specification.new do |spec|
   end
   spec.require_paths = ["lib"]
 
+  # For development on this gem
   spec.add_development_dependency "awesome_print", "~> 1.0"
   spec.add_development_dependency "rspec", "~> 3.0"
   spec.add_development_dependency 'yard', '~> 0.9'
+  spec.add_development_dependency 'minitest'
+
 end
