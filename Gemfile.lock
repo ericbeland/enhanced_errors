@@ -7,8 +7,8 @@ GEM
   remote: https://rubygems.org/
   specs:
     awesome_print (1.9.2)
-    byebug (11.1.3)
     diff-lcs (1.5.1)
+    minitest (5.25.4)
     rspec (3.13.0)
       rspec-core (~> 3.13.0)
       rspec-expectations (~> 3.13.0)
@@ -29,8 +29,8 @@ PLATFORMS
 
 DEPENDENCIES
   awesome_print (~> 1.0)
-  byebug
   enhanced_errors!
+  minitest
   rspec (~> 3.0)
   yard (~> 0.9)
 
