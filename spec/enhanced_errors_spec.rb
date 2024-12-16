@@ -20,7 +20,7 @@ def configure_rspec
     end
 
     config.after(:example) do |example|
-      EnhancedErrors.override_exception_message(example.exception, EnhancedErrors.stop_rspec_binding_capture)
+      EnhancedErrors.override_rspec_message(example, EnhancedErrors.stop_rspec_binding_capture)
     end
   end
 end
@@ -569,6 +569,7 @@ RSpec.describe EnhancedErrors do
           expect(method_and_args[:args]).to include('arg1="value1"', 'arg2="value2"')
         end
       end
+
     end
 
     it 'captures binding information when exceptions are rescued and re-raised' do

@@ -85,6 +85,8 @@ class EnhancedErrors
 
     DEFAULT_SKIP_LIST = (RAILS_SKIP_LIST + RSPEC_SKIP_LIST + MINITEST_SKIP_LIST)
 
+    RSPEC_HANDLER_NAMES = ['RSpec::Expectations::PositiveExpectationHandler', 'RSpec::Expectations::NegativeExpectationHandler']
+
     @enabled = false
     @max_length = nil
     @capture_rescue = nil
@@ -149,6 +151,8 @@ class EnhancedErrors
 
     def increment_capture_events_count
       mutex.synchronize do
+        @capture_events_count ||= 0
+        @max_capture_events ||= -1
         @capture_events_count += 1
         # Check if we've hit the limit
         if @max_capture_events > 0 && @capture_events_count >= @max_capture_events
@@ -182,6 +186,19 @@ class EnhancedErrors
       mutex.synchronize do
         @skip_list ||= DEFAULT_SKIP_LIST
       end
+    end
+
+    def override_rspec_message(example, binding_or_bindings)
+      exception_obj = example.exception
+      case exception_obj
+      when nil
+        return nil
+      when RSpec::Core::MultipleExceptionError
+        override_exception_message(exception_obj.all_exceptions.first, binding_or_bindings)
+      else
+        override_exception_message(exception_obj, binding_or_bindings)
+      end
+
     end
 
     def override_exception_message(exception, binding_or_bindings)
@@ -312,6 +329,19 @@ class EnhancedErrors
       end
     end
 
+    def class_to_string(klass)
+      return '' if klass.nil?
+      if klass.singleton_class?
+        klass.to_s.match(/#<Class:(.*?)>/)[1]
+      else
+        klass.to_s
+      end
+    end
+
+    def is_rspec_example?(tracepoint)
+      tracepoint.method_id.nil?  && !(tracepoint.path.include?('rspec')) && tracepoint.path.end_with?('_spec.rb')
+    end
+
     def start_rspec_binding_capture
       mutex.synchronize do
         @rspec_example_binding = nil
@@ -320,18 +350,27 @@ class EnhancedErrors
         @enabled = true if @enabled.nil?
 
         @rspec_tracepoint = TracePoint.new(:raise, :b_return) do |tp|
-          # This trickery is to help us identify the anonymous block return we want to grab
+          # puts "name #{tp.raised_exception.class.name rescue ''} method:#{tp.method_id} tp.binding:#{tp.binding.local_variables rescue ''}"
+          # puts "event: #{tp.event} defined_class#{class_to_string(tp.defined_class)} #{tp.path}:#{tp.lineno} #{tp.callee_id} "
+          # This trickery below is to help us identify the anonymous block return we want to grab
+          # Very kluge-y and edge cases have grown it, but it works
           if tp.event == :b_return
-            next unless @capture_next_binding && @rspec_example_binding.nil?
-            if @capture_next_binding && tp.method_id.nil? && !(tp.path.include?('rspec')) && tp.path.end_with?('_spec.rb')
-              if determine_object_name(tp) =~ RSPEC_EXAMPLE_REGEXP
-                increment_capture_events_count
-                @rspec_example_binding = tp.binding
-              end
+            if RSPEC_HANDLER_NAMES.include?(class_to_string(tp.defined_class))
+              @capture_next_binding = :next
+              next
+            end
+            next unless @capture_next_binding
+
+            if @capture_next_binding == :next || @capture_next_binding == :next_matching && is_rspec_example?(tp)
+              increment_capture_events_count
+              @capture_next_binding = false
+              @rspec_example_binding = tp.binding
             end
           elsif tp.event == :raise
-            if tp.raised_exception.class.name == 'RSpec::Expectations::ExpectationNotMetError'
-              @capture_next_binding ||= true
+            class_name = tp.raised_exception.class.name
+            case class_name
+            when 'RSpec::Expectations::ExpectationNotMetError'
+              @capture_next_binding = :next_matching
             else
               handle_tracepoint_event(tp)
             end
