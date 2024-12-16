@@ -21,65 +21,64 @@ class EnhancedErrors
       @monitor ||= Monitor.new
     end
 
-    attr_accessor :enabled, :config_block, :on_capture_hook, :eligible_for_capture, :trace, :override_messages
+    attr_accessor :enabled, :config_block, :on_capture_hook, :eligible_for_capture, :exception_trace, :override_messages
 
     GEMS_REGEX = %r{[\/\\]gems[\/\\]}
-    RSPEC_EXAMPLE_REGEXP = /RSpec::ExampleGroups::[A-Z0-9]+.*/
     DEFAULT_MAX_LENGTH = 2000
     MAX_BINDING_INFOS = 3
 
     RSPEC_SKIP_LIST = [
-                                :@__inspect_output,
-                                :@__memoized,
-                                :@assertion_delegator,
-                                :@assertion_instance,
-                                :@assertions,
-                                :@connection_subscriber,
-                                :@example,
-                                :@fixture_cache,
-                                :@fixture_cache_key,
-                                :@fixture_connection_pools,
-                                :@fixture_connections,
-                                :@integration_session,
-                                :@legacy_saved_pool_configs,
-                                :@loaded_fixtures,
-                                :@matcher_definitions,
-                                :@saved_pool_configs
-                              ].freeze
+      :@__inspect_output,
+      :@__memoized,
+      :@assertion_delegator,
+      :@assertion_instance,
+      :@assertions,
+      :@connection_subscriber,
+      :@example,
+      :@fixture_cache,
+      :@fixture_cache_key,
+      :@fixture_connection_pools,
+      :@fixture_connections,
+      :@integration_session,
+      :@legacy_saved_pool_configs,
+      :@loaded_fixtures,
+      :@matcher_definitions,
+      :@saved_pool_configs
+    ].freeze
 
     RAILS_SKIP_LIST = [
-                                :@new_record,
-                                :@attributes,
-                                :@association_cache,
-                                :@readonly,
-                                :@previously_new_record,
-                                :@_routes,
-                                :@routes,
-                                :@app,
-                                :@arel_table,
-                                :@assertion_instance,
-                                :@association_cache,
-                                :@attributes,
-                                :@destroyed,
-                                :@destroyed_by_association,
-                                :@find_by_statement_cache,
-                                :@generated_relation_method,
-                                :@integration_session,
-                                :@marked_for_destruction,
-                                :@mutations_before_last_save,
-                                :@mutations_from_database,
-                                :@new_record,
-                                :@predicate_builder,
-                                :@previously_new_record,
-                                :@primary_key,
-                                :@readonly,
-                                :@relation_delegate_cache,
-                                :@response,
-                                :@response_klass,
-                                :@routes,
-                                :@strict_loading,
-                                :@strict_loading_mode
-                              ].freeze
+      :@new_record,
+      :@attributes,
+      :@association_cache,
+      :@readonly,
+      :@previously_new_record,
+      :@_routes,
+      :@routes,
+      :@app,
+      :@arel_table,
+      :@assertion_instance,
+      :@association_cache,
+      :@attributes,
+      :@destroyed,
+      :@destroyed_by_association,
+      :@find_by_statement_cache,
+      :@generated_relation_method,
+      :@integration_session,
+      :@marked_for_destruction,
+      :@mutations_before_last_save,
+      :@mutations_from_database,
+      :@new_record,
+      :@predicate_builder,
+      :@previously_new_record,
+      :@primary_key,
+      :@readonly,
+      :@relation_delegate_cache,
+      :@response,
+      :@response_klass,
+      :@routes,
+      :@strict_loading,
+      :@strict_loading_mode
+    ].freeze
 
     MINITEST_SKIP_LIST = [:@NAME, :@failures, :@time].freeze
 
@@ -96,12 +95,11 @@ class EnhancedErrors
     @output_format = nil
     @eligible_for_capture = nil
     @original_global_variables = nil
-    @trace = nil
+    @exception_trace = nil
     @override_messages = nil
-    @rspec_failure_message_loaded = nil
 
     # Default values
-    @max_capture_events = -1   # -1 means no limit
+    @max_capture_events = -1 # -1 means no limit
     @capture_events_count = 0
 
     # Thread-safe getters and setters
@@ -118,11 +116,11 @@ class EnhancedErrors
     end
 
     def capture_rescue
-      mutex.synchronize {  @capture_rescue }
+      mutex.synchronize { @capture_rescue }
     end
 
     def capture_events_count
-      mutex.synchronize { @capture_events_count }
+      mutex.synchronize { @capture_events_count || 0 }
     end
 
     def capture_events_count=(val)
@@ -130,7 +128,7 @@ class EnhancedErrors
     end
 
     def max_capture_events
-      mutex.synchronize { @max_capture_events }
+      mutex.synchronize { @max_capture_events || -1 }
     end
 
     def max_capture_events=(value)
@@ -141,11 +139,30 @@ class EnhancedErrors
           if @enabled
             puts "EnhancedErrors: max_capture_events set to 0, disabling capturing."
             @enabled = false
-            @trace&.disable
+            @exception_trace&.disable
             @rspec_tracepoint&.disable
             @minitest_trace&.disable
           end
         end
+      end
+    end
+
+    def enforce_capture_limit!
+      disable_capturing! if capture_limit_exceeded?
+    end
+
+    def capture_limit_exceeded?
+      mutex.synchronize do
+       max_capture_events > 0 && capture_events_count >= max_capture_events
+      end
+    end
+
+    def disable_capturing!
+      mutex.synchronize do
+        @enabled = false
+        @rspec_tracepoint&.disable
+        @minitest_trace&.disable
+        @exception_trace&.disable
       end
     end
 
@@ -154,20 +171,12 @@ class EnhancedErrors
         @capture_events_count ||= 0
         @max_capture_events ||= -1
         @capture_events_count += 1
-        # Check if we've hit the limit
-        if @max_capture_events > 0 && @capture_events_count >= @max_capture_events
-          # puts "EnhancedErrors: max_capture_events limit (#{@max_capture_events}) reached, disabling capturing."
-          @enabled = false
-        end
       end
     end
 
     def reset_capture_events_count
       mutex.synchronize do
         @capture_events_count = 0
-        @enabled = true
-        @rspec_tracepoint.enable if @rspec_tracepoint
-        @trace.enable if @trace
       end
     end
 
@@ -228,8 +237,8 @@ class EnhancedErrors
 
     def enhance_exceptions!(enabled: true, debug: false, capture_events: nil, override_messages: false, **options, &block)
       mutex.synchronize do
-        @trace&.disable
-        @trace = nil
+        @exception_trace&.disable
+        @exception_trace = nil
 
         @output_format = nil
         @eligible_for_capture = nil
@@ -237,7 +246,9 @@ class EnhancedErrors
         @override_messages = override_messages
 
         # Ensure these are not nil
-        @max_capture_events = -1 if @max_capture_events.nil?
+        if @max_capture_events.nil?
+          @max_capture_events = -1
+        end
         @capture_events_count = 0
 
         @rspec_failure_message_loaded = true
@@ -273,13 +284,13 @@ class EnhancedErrors
         end
 
         events = @capture_events ? @capture_events.to_a : default_capture_events
-        @trace = TracePoint.new(*events) do |tp|
+        @exception_trace = TracePoint.new(*events) do |tp|
           handle_tracepoint_event(tp)
         end
 
         # Only enable trace if still enabled and not limited
         if @enabled && (@max_capture_events == -1 || @capture_events_count < @max_capture_events)
-          @trace.enable
+          @exception_trace.enable
         end
       end
     end
@@ -295,23 +306,12 @@ class EnhancedErrors
       end
     end
 
-    def safely_prepend_rspec_custom_failure_message
-      mutex.synchronize do
-        return if @rspec_failure_message_loaded
-        if defined?(RSpec::Core::Example) && !RSpec::Core::Example < Enhanced::Integrations::RSpecErrorFailureMessage
-          RSpec::Core::Example.prepend(Enhanced::Integrations::RSpecErrorFailureMessage)
-          @rspec_failure_message_loaded = true
-        end
-      end
-    rescue => e
-      puts "Failed to prepend RSpec custom failure message: #{e.message}"
-    end
-
     def is_a_minitest?(klass)
       klass.ancestors.include?(Minitest::Test) && klass.name != 'Minitest::Test'
     end
 
     def start_minitest_binding_capture
+      return if capture_limit_exceeded?
       mutex.synchronize do
         @minitest_trace = TracePoint.new(:return) do |tp|
           next unless tp.method_id.to_s.start_with?('test_') && is_a_minitest?(tp.defined_class)
@@ -322,6 +322,7 @@ class EnhancedErrors
     end
 
     def stop_minitest_binding_capture
+      disable_capturing! if capture_limit_exceeded?
       mutex.synchronize do
         @minitest_trace&.disable
         @minitest_trace = nil
@@ -332,22 +333,22 @@ class EnhancedErrors
     def class_to_string(klass)
       return '' if klass.nil?
       if klass.singleton_class?
-        klass.to_s.match(/#<Class:(.*?)>/)[1]
+        (match = klass.to_s.match(/#<Class:(.*?)>/)) ? match[1] : klass.to_s
       else
         klass.to_s
       end
     end
 
     def is_rspec_example?(tracepoint)
-      tracepoint.method_id.nil?  && !(tracepoint.path.include?('rspec')) && tracepoint.path.end_with?('_spec.rb')
+      tracepoint.method_id.nil? && !(tracepoint.path.include?('rspec')) && tracepoint.path.end_with?('_spec.rb')
     end
 
     def start_rspec_binding_capture
+      return if capture_limit_exceeded?
       mutex.synchronize do
         @rspec_example_binding = nil
         @capture_next_binding = false
         @rspec_tracepoint&.disable
-        @enabled = true if @enabled.nil?
 
         @rspec_tracepoint = TracePoint.new(:raise, :b_return) do |tp|
           # puts "name #{tp.raised_exception.class.name rescue ''} method:#{tp.method_id} tp.binding:#{tp.binding.local_variables rescue ''}"
@@ -381,6 +382,7 @@ class EnhancedErrors
     end
 
     def stop_rspec_binding_capture
+      disable_capturing! if capture_limit_exceeded?
       mutex.synchronize do
         @rspec_tracepoint&.disable
         @rspec_tracepoint = nil
@@ -606,6 +608,7 @@ class EnhancedErrors
 
     def handle_tracepoint_event(tp)
       # Check enabled outside the synchronized block for speed, but still safe due to re-check inside.
+      enforce_capture_limit!
       return unless mutex.synchronize { @enabled }
       return if Thread.current[:enhanced_errors_processing] || Thread.current[:on_capture] || ignored_exception?(tp.raised_exception)
 
@@ -751,7 +754,7 @@ class EnhancedErrors
     end
 
     def valid_capture_events?(capture_events)
-      capture_events.is_a?(Array) && [:raise, :rescue] && capture_events
+      capture_events.is_a?(Array) && capture_events.all? { |ev| [:raise, :rescue].include?(ev) }
     end
 
     def extract_arguments(tp, method_name)

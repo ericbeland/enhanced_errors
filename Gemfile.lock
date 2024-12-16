@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    enhanced_errors (2.1.1)
+    enhanced_errors (2.1.2)
 
 GEM
   remote: https://rubygems.org/
