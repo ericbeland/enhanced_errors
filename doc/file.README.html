@@ -103,8 +103,12 @@
     <span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_start_rspec_binding_capture'><span class='object_link'><a href="EnhancedErrors.html#start_rspec_binding_capture-class_method" title="EnhancedErrors.start_rspec_binding_capture (method)">start_rspec_binding_capture</a></span></span>
   <span class='kw'>end</span>
 
+  <span class='id identifier rubyid_config'>config</span><span class='period'>.</span><span class='id identifier rubyid_before'>before</span><span class='lparen'>(</span><span class='symbol'>:example</span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid__example'>_example</span><span class='op'>|</span>
+    <span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_start_rspec_binding_capture'><span class='object_link'><a href="EnhancedErrors.html#start_rspec_binding_capture-class_method" title="EnhancedErrors.start_rspec_binding_capture (method)">start_rspec_binding_capture</a></span></span>
+  <span class='kw'>end</span>
+
   <span class='id identifier rubyid_config'>config</span><span class='period'>.</span><span class='id identifier rubyid_after'>after</span><span class='lparen'>(</span><span class='symbol'>:example</span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_example'>example</span><span class='op'>|</span>
-    <span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_override_exception_message'><span class='object_link'><a href="EnhancedErrors.html#override_exception_message-class_method" title="EnhancedErrors.override_exception_message (method)">override_exception_message</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_example'>example</span><span class='period'>.</span><span class='id identifier rubyid_exception'>exception</span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_stop_rspec_binding_capture'><span class='object_link'><a href="EnhancedErrors.html#stop_rspec_binding_capture-class_method" title="EnhancedErrors.stop_rspec_binding_capture (method)">stop_rspec_binding_capture</a></span></span><span class='rparen'>)</span>
+    <span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_override_rspec_message'><span class='object_link'><a href="EnhancedErrors.html#override_rspec_message-class_method" title="EnhancedErrors.override_rspec_message (method)">override_rspec_message</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_example'>example</span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_stop_rspec_binding_capture'><span class='object_link'><a href="EnhancedErrors.html#stop_rspec_binding_capture-class_method" title="EnhancedErrors.stop_rspec_binding_capture (method)">stop_rspec_binding_capture</a></span></span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 <span class='kw'>end</span>
 </code></pre>
@@ -482,7 +486,7 @@
 </div></div>
 
       <div id="footer">
-  Generated on Sun Dec 15 15:24:24 2024 by
+  Generated on Sun Dec 15 22:33:19 2024 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.37 (ruby-3.1.3).
 </div>
