@@ -86,7 +86,7 @@ class EnhancedErrors
 
     RSPEC_HANDLER_NAMES = ['RSpec::Expectations::PositiveExpectationHandler', 'RSpec::Expectations::NegativeExpectationHandler']
 
-    @enabled = false
+    @enabled = nil
     @max_length = nil
     @capture_rescue = nil
     @skip_list = nil
@@ -134,21 +134,13 @@ class EnhancedErrors
     def max_capture_events=(value)
       mutex.synchronize do
         @max_capture_events = value
-        if @max_capture_events == 0
-          # Disable capturing
-          if @enabled
-            puts "EnhancedErrors: max_capture_events set to 0, disabling capturing."
-            @enabled = false
-            @exception_trace&.disable
-            @rspec_tracepoint&.disable
-            @minitest_trace&.disable
-          end
-        end
       end
     end
 
-    def enforce_capture_limit!
+    def enforce_capture_limit
+      exceeded = capture_limit_exceeded?
       disable_capturing! if capture_limit_exceeded?
+      exceeded
     end
 
     def capture_limit_exceeded?
@@ -174,9 +166,16 @@ class EnhancedErrors
       end
     end
 
-    def reset_capture_events_count
+    def reset!
       mutex.synchronize do
+        @rspec_tracepoint&.disable
+        @minitest_trace&.disable
+        @exception_trace&.disable
+        @rspec_tracepoint = nil
+        @minitest_trace = nil
+        @exception_trace = nil
         @capture_events_count = 0
+        @enabled = true
       end
     end
 
@@ -249,17 +248,11 @@ class EnhancedErrors
         if @max_capture_events.nil?
           @max_capture_events = -1
         end
-        @capture_events_count = 0
+        @capture_events_count ||= 0
 
         @rspec_failure_message_loaded = true
 
-        if !enabled
-          @original_global_variables = nil
-          @enabled = false
-          return
-        end
-
-        @enabled = true
+        @enabled = enabled
         @debug = debug
         @original_global_variables = global_variables if @debug
 
@@ -311,11 +304,13 @@ class EnhancedErrors
     end
 
     def start_minitest_binding_capture
-      return if capture_limit_exceeded?
+      return if enforce_capture_limit
+      @enabled = true if @enabled.nil?
       mutex.synchronize do
         @minitest_trace = TracePoint.new(:return) do |tp|
           next unless tp.method_id.to_s.start_with?('test_') && is_a_minitest?(tp.defined_class)
           @minitest_test_binding = tp.binding
+          increment_capture_events_count
         end
         @minitest_trace.enable
       end
@@ -344,7 +339,8 @@ class EnhancedErrors
     end
 
     def start_rspec_binding_capture
-      return if capture_limit_exceeded?
+      return if enforce_capture_limit
+      @enabled = true if @enabled.nil?
       mutex.synchronize do
         @rspec_example_binding = nil
         @capture_next_binding = false
@@ -363,8 +359,8 @@ class EnhancedErrors
             next unless @capture_next_binding
 
             if @capture_next_binding == :next || @capture_next_binding == :next_matching && is_rspec_example?(tp)
-              increment_capture_events_count
               @capture_next_binding = false
+              increment_capture_events_count
               @rspec_example_binding = tp.binding
             end
           elsif tp.event == :raise
@@ -608,8 +604,8 @@ class EnhancedErrors
 
     def handle_tracepoint_event(tp)
       # Check enabled outside the synchronized block for speed, but still safe due to re-check inside.
-      enforce_capture_limit!
-      return unless mutex.synchronize { @enabled }
+      return unless enabled
+      return if enforce_capture_limit
       return if Thread.current[:enhanced_errors_processing] || Thread.current[:on_capture] || ignored_exception?(tp.raised_exception)
 
       Thread.current[:enhanced_errors_processing] = true
@@ -685,6 +681,7 @@ class EnhancedErrors
 
       if binding_info
         binding_info = validate_binding_format(binding_info)
+        increment_capture_events_count
         if binding_info && exception.binding_infos.length >= MAX_BINDING_INFOS
           exception.binding_infos.delete_at(MAX_BINDING_INFOS / 2.round)
         end
@@ -693,7 +690,6 @@ class EnhancedErrors
           mutex.synchronize do
             override_exception_message(exception, exception.binding_infos) if @override_messages
           end
-          increment_capture_events_count
         end
       end
     rescue

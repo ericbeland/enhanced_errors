@@ -627,7 +627,7 @@ RSpec.describe EnhancedErrors do
         EnhancedErrors.enhance_exceptions!(enabled: false)
         disabled_trace = EnhancedErrors.exception_trace
         # we have switched to cleaning it up, as it seems safer
-        expect(disabled_trace && disabled_trace.enabled).to be_falsey
+        expect(disabled_trace && disabled_trace.enabled?).to be_falsey
       end
 
       it 'caps max binding_infos to track at 10' do
@@ -648,12 +648,11 @@ RSpec.describe EnhancedErrors do
       it 'remains disabled after being disabled until explicitly re-enabled' do
         # Ensure EnhancedErrors is disabled
         EnhancedErrors.enhance_exceptions!(enabled: false)
-        EnhancedErrors.exception_trace = nil
         expect(EnhancedErrors.enabled).to be false
 
         # Ensure the TracePoint for the current thread is nil
         trace = EnhancedErrors.exception_trace
-        expect(trace).to be_nil
+        expect(trace.enabled?).to be_falsy
 
         # Raise an exception and ensure @binding_infos is not set
         expect {
@@ -892,7 +891,7 @@ RSpec.describe EnhancedErrors, 'max_capture_events functionality' do
   before(:each) do
     # Fully reset the environment before each test
     EnhancedErrors.enhance_exceptions!(enabled: false)
-    EnhancedErrors.reset_capture_events_count
+    EnhancedErrors.reset!
     EnhancedErrors.max_capture_events = -1
     EnhancedErrors.exception_trace = nil
 
@@ -908,7 +907,7 @@ RSpec.describe EnhancedErrors, 'max_capture_events functionality' do
   after(:each) do
     # Disable after each test to avoid state leaking into subsequent tests
     EnhancedErrors.enhance_exceptions!(enabled: false)
-    EnhancedErrors.reset_capture_events_count
+    EnhancedErrors.reset!
     EnhancedErrors.max_capture_events = -1
     EnhancedErrors.exception_trace = nil
   end
@@ -970,24 +969,32 @@ RSpec.describe EnhancedErrors, 'max_capture_events functionality' do
       raise 'Hit the limit'
     }.to raise_error(StandardError)
 
-
+    expect(EnhancedErrors.capture_events_count).to eq(1)
     # Reset the count
-    EnhancedErrors.reset_capture_events_count
+    EnhancedErrors.reset!
     expect(EnhancedErrors.capture_events_count).to eq(0)
     EnhancedErrors.max_capture_events = 1
-
+    EnhancedErrors.enhance_exceptions!
+    EnhancedErrors.max_capture_events = 1
+    expect(EnhancedErrors.enabled).to be true
     # Now we should be able to capture again
     expect {
       raise 'Now capturing again'
     }.to raise_error(StandardError)
-    #expect(EnhancedErrors.capture_events_count).to eq(1)
+    expect(EnhancedErrors.capture_events_count).to eq(1)
+
+    expect {
+      raise 'Now capturing again'
+    }.to raise_error(StandardError)
+    expect(EnhancedErrors.capture_events_count).to eq(1)
     # Should be disabled again after hitting the limit
     expect(EnhancedErrors.enabled).to be false
   end
 
   it 'allows unlimited capturing when max_capture_events = -1' do
-    EnhancedErrors.reset_capture_events_count
+    EnhancedErrors.reset!
     expect(EnhancedErrors.capture_events_count).to eq(0)
+    EnhancedErrors.enhance_exceptions!
 
     # this is doubled as each raise is both an RSpec expectation
     # failure, and also a StandardError
