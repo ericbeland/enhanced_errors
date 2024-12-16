@@ -14,8 +14,12 @@ RSpec.configure do |config|
     EnhancedErrors.start_rspec_binding_capture
   end
 
+  config.before(:example) do |_example|
+    EnhancedErrors.start_rspec_binding_capture
+  end
+
   config.after(:example) do |example|
-    EnhancedErrors.override_exception_message(example.exception, EnhancedErrors.stop_rspec_binding_capture)
+    EnhancedErrors.override_rspec_message(example, EnhancedErrors.stop_rspec_binding_capture)
   end
   # -- End EnhancedErrors config
 
@@ -36,6 +40,17 @@ RSpec.describe 'Neo' do
       stop = 'bullets'
       raise 'No!'
     end
+
+    it "dodges multiple exception-bullets at once" do
+      foo = 'bar'
+      expect(1).to eq(2)
+      expect(true).to eq(false)
+    end
+
+    after(:each) do
+      raise "This is another error"
+    end
+
   end
 end
 
