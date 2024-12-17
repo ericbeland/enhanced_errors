@@ -243,7 +243,7 @@
 <p>You can pass configuration options to <code>enhance_exceptions!</code>:</p>
 
 <pre class="code ruby"><code class="ruby">
-<span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_enhance_exceptions!'><span class='object_link'><a href="EnhancedErrors.html#enhance_exceptions!-class_method" title="EnhancedErrors.enhance_exceptions! (method)">enhance_exceptions!</a></span></span><span class='lparen'>(</span><span class='label'>enabled:</span> <span class='kw'>true</span><span class='comma'>,</span> <span class='label'>max_length:</span> <span class='int'>2000</span><span class='rparen'>)</span> <span class='kw'>do</span>
+<span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_enhance_exceptions!'><span class='object_link'><a href="EnhancedErrors.html#enhance_exceptions!-class_method" title="EnhancedErrors.enhance_exceptions! (method)">enhance_exceptions!</a></span></span><span class='lparen'>(</span><span class='label'>enabled:</span> <span class='kw'>true</span><span class='comma'>,</span> <span class='label'>max_capture_length:</span> <span class='int'>2000</span><span class='rparen'>)</span> <span class='kw'>do</span>
   <span class='comment'># Additional configuration here
 </span>  <span class='id identifier rubyid_add_to_skip_list'>add_to_skip_list</span> <span class='symbol'>:@instance_variable_to_skip</span><span class='comma'>,</span> <span class='symbol'>:local_to_skip</span>
 <span class='kw'>end</span>
@@ -253,7 +253,7 @@
 </li><li>
 <p><code>enabled</code>: Enables or disables the enhancement (default: <code>true</code>).</p>
 </li><li>
-<p><code>max_length</code>: Sets the maximum length of the captured_variables string (default: <code>2500</code>).</p>
+<p><code>max_capture_length</code>: Sets the maximum length of the captured_variables string (default: <code>2500</code>).</p>
 </li></ul>
 
 <h3 id="label-Environment-Based+Defaults">Environment-Based Defaults</h3>
@@ -486,7 +486,7 @@
 </div></div>
 
       <div id="footer">
-  Generated on Tue Dec 17 14:09:26 2024 by
+  Generated on Tue Dec 17 15:42:48 2024 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.37 (ruby-3.3.6).
 </div>
