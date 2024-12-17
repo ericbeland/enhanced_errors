@@ -71,6 +71,11 @@
   
   
   
+  <dl>
+      <dt>Includes:</dt>
+      <dd><span class='object_link'><a href="ExceptionBindingInfos.html" title="ExceptionBindingInfos (module)">ExceptionBindingInfos</a></span></dd>
+  </dl>
+  
   
 
   
@@ -83,18 +88,8 @@
   
 </div>
 
-<h2>Overview</h2><div class="docstring">
-  <div class="discussion">
-    
-<p>exception.rb</p>
 
 
-  </div>
-</div>
-<div class="tags">
-  
-
-</div>
 
 
 
@@ -102,146 +97,21 @@
 
 
   
-    <h2>
-      Instance Method Summary
-      <small><a href="#" class="summary_toggle">collapse</a></small>
-    </h2>
+  
+  
+  
+  
+  
+  <h2>Method Summary</h2>
+  
+  <h3 class="inherited">Methods included from <span class='object_link'><a href="ExceptionBindingInfos.html" title="ExceptionBindingInfos (module)">ExceptionBindingInfos</a></span></h3>
+  <p class="inherited"><span class='object_link'><a href="ExceptionBindingInfos.html#binding_infos-instance_method" title="ExceptionBindingInfos#binding_infos (method)">#binding_infos</a></span>, <span class='object_link'><a href="ExceptionBindingInfos.html#captured_variables-instance_method" title="ExceptionBindingInfos#captured_variables (method)">#captured_variables</a></span></p>
 
-    <ul class="summary">
-      
-        <li class="public ">
-  <span class="summary_signature">
-    
-      <a href="#binding_infos-instance_method" title="#binding_infos (instance method)">#<strong>binding_infos</strong>  &#x21d2; Object </a>
-    
-
-    
-  </span>
-  
-  
-  
-  
-  
-  
-  
-
-  
-    <span class="summary_desc"><div class='inline'></div></span>
-  
-</li>
-
-      
-        <li class="public ">
-  <span class="summary_signature">
-    
-      <a href="#captured_variables-instance_method" title="#captured_variables (instance method)">#<strong>captured_variables</strong>  &#x21d2; Object </a>
-    
-
-    
-  </span>
-  
-  
-  
-  
-  
-  
-  
-
-  
-    <span class="summary_desc"><div class='inline'></div></span>
-  
-</li>
-
-      
-    </ul>
-  
-
-
-
-  <div id="instance_method_details" class="method_details_list">
-    <h2>Instance Method Details</h2>
-
-    
-      <div class="method_details first">
-  <h3 class="signature first" id="binding_infos-instance_method">
-  
-    #<strong>binding_infos</strong>  &#x21d2; <tt>Object</tt> 
-  
-
-  
-
-  
-</h3><table class="source_code">
-  <tr>
-    <td>
-      <pre class="lines">
-
-
-15
-16
-17</pre>
-    </td>
-    <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced/exception.rb', line 15</span>
-
-<span class='kw'>def</span> <span class='id identifier rubyid_binding_infos'>binding_infos</span>
-  <span class='ivar'>@binding_infos</span> <span class='op'>||=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
-<span class='kw'>end</span></pre>
-    </td>
-  </tr>
-</table>
-</div>
-    
-      <div class="method_details ">
-  <h3 class="signature " id="captured_variables-instance_method">
-  
-    #<strong>captured_variables</strong>  &#x21d2; <tt>Object</tt> 
-  
-
-  
-
-  
-</h3><table class="source_code">
-  <tr>
-    <td>
-      <pre class="lines">
-
-
-4
-5
-6
-7
-8
-9
-10
-11
-12
-13</pre>
-    </td>
-    <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced/exception.rb', line 4</span>
-
-<span class='kw'>def</span> <span class='id identifier rubyid_captured_variables'>captured_variables</span>
-  <span class='kw'>if</span> <span class='id identifier rubyid_binding_infos'>binding_infos</span><span class='period'>.</span><span class='id identifier rubyid_any?'>any?</span>
-    <span class='id identifier rubyid_bindings_of_interest'>bindings_of_interest</span> <span class='op'>=</span> <span class='id identifier rubyid_select_binding_infos'>select_binding_infos</span>
-    <span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_format'><span class='object_link'><a href="EnhancedErrors.html#format-class_method" title="EnhancedErrors.format (method)">format</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_bindings_of_interest'>bindings_of_interest</span><span class='rparen'>)</span>
-  <span class='kw'>else</span>
-    <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_end'>&#39;</span></span>
-  <span class='kw'>end</span>
-<span class='kw'>rescue</span>
-  <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_end'>&#39;</span></span>
-<span class='kw'>end</span></pre>
-    </td>
-  </tr>
-</table>
-</div>
-    
-  </div>
 
 </div>
 
       <div id="footer">
-  Generated on Mon Dec 16 11:33:57 2024 by
+  Generated on Tue Dec 17 14:09:26 2024 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.37 (ruby-3.3.6).
 </div>

@@ -1549,7 +1549,6 @@
       <pre class="lines">
 
 
-538
 539
 540
 541
@@ -1559,10 +1558,11 @@
 545
 546
 547
-548</pre>
+548
+549</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 538</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 539</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_apply_skip_list'>apply_skip_list</span><span class='lparen'>(</span><span class='id identifier rubyid_binding_info'>binding_info</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_mutex'>mutex</span><span class='period'>.</span><span class='id identifier rubyid_synchronize'>synchronize</span> <span class='kw'>do</span>
@@ -1595,7 +1595,6 @@
       <pre class="lines">
 
 
-557
 558
 559
 560
@@ -1638,10 +1637,11 @@
 597
 598
 599
-600</pre>
+600
+601</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 557</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 558</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_binding_info_string'>binding_info_string</span><span class='lparen'>(</span><span class='id identifier rubyid_binding_info'>binding_info</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_exception'>exception</span> <span class='op'>=</span> <span class='id identifier rubyid_safe_to_s'>safe_to_s</span><span class='lparen'>(</span><span class='id identifier rubyid_binding_info'>binding_info</span><span class='lbracket'>[</span><span class='symbol'>:exception</span><span class='rbracket'>]</span><span class='rparen'>)</span>
@@ -1707,16 +1707,16 @@
       <pre class="lines">
 
 
-495
 496
 497
 498
 499
 500
-501</pre>
+501
+502</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 495</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 496</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_binding_infos_array_to_string'>binding_infos_array_to_string</span><span class='lparen'>(</span><span class='id identifier rubyid_captured_bindings'>captured_bindings</span><span class='comma'>,</span> <span class='id identifier rubyid_format'>format</span> <span class='op'>=</span> <span class='symbol'>:terminal</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_end'>&#39;</span></span> <span class='kw'>if</span> <span class='id identifier rubyid_captured_bindings'>captured_bindings</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span> <span class='op'>||</span> <span class='id identifier rubyid_captured_bindings'>captured_bindings</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
@@ -1921,17 +1921,17 @@
       <pre class="lines">
 
 
-328
 329
 330
 331
 332
 333
 334
-335</pre>
+335
+336</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 328</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 329</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_class_to_string'>class_to_string</span><span class='lparen'>(</span><span class='id identifier rubyid_klass'>klass</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_end'>&#39;</span></span> <span class='kw'>if</span> <span class='id identifier rubyid_klass'>klass</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span>
@@ -1961,7 +1961,6 @@
       <pre class="lines">
 
 
-392
 393
 394
 395
@@ -2000,10 +1999,11 @@
 428
 429
 430
-431</pre>
+431
+432</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 392</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 393</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_convert_binding_to_binding_info'>convert_binding_to_binding_info</span><span class='lparen'>(</span><span class='id identifier rubyid_b'>b</span><span class='comma'>,</span> <span class='label'>capture_let_variables:</span> <span class='kw'>true</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_file'>file</span> <span class='op'>=</span> <span class='id identifier rubyid_b'>b</span><span class='period'>.</span><span class='id identifier rubyid_eval'>eval</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>__FILE__</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
@@ -2269,7 +2269,6 @@
       <pre class="lines">
 
 
-475
 476
 477
 478
@@ -2287,10 +2286,11 @@
 490
 491
 492
-493</pre>
+493
+494</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 475</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 476</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_format'>format</span><span class='lparen'>(</span><span class='id identifier rubyid_captured_binding_infos'>captured_binding_infos</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span><span class='comma'>,</span> <span class='id identifier rubyid_output_format'>output_format</span> <span class='op'>=</span> <span class='id identifier rubyid_get_default_format_for_environment'>get_default_format_for_environment</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_end'>&#39;</span></span> <span class='kw'>if</span> <span class='id identifier rubyid_captured_binding_infos'>captured_binding_infos</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span> <span class='op'>||</span> <span class='id identifier rubyid_captured_binding_infos'>captured_binding_infos</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
@@ -2331,7 +2331,6 @@
       <pre class="lines">
 
 
-503
 504
 505
 506
@@ -2348,10 +2347,11 @@
 517
 518
 519
-520</pre>
+520
+521</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 503</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 504</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_get_default_format_for_environment'>get_default_format_for_environment</span>
   <span class='id identifier rubyid_mutex'>mutex</span><span class='period'>.</span><span class='id identifier rubyid_synchronize'>synchronize</span> <span class='kw'>do</span>
@@ -2503,12 +2503,12 @@
       <pre class="lines">
 
 
-337
 338
-339</pre>
+339
+340</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 337</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 338</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_is_rspec_example?'>is_rspec_example?</span><span class='lparen'>(</span><span class='id identifier rubyid_tracepoint'>tracepoint</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_tracepoint'>tracepoint</span><span class='period'>.</span><span class='id identifier rubyid_method_id'>method_id</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='lparen'>(</span><span class='id identifier rubyid_tracepoint'>tracepoint</span><span class='period'>.</span><span class='id identifier rubyid_path'>path</span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>rspec</span><span class='tstring_end'>&#39;</span></span><span class='rparen'>)</span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_tracepoint'>tracepoint</span><span class='period'>.</span><span class='id identifier rubyid_path'>path</span><span class='period'>.</span><span class='id identifier rubyid_end_with?'>end_with?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>_spec.rb</span><span class='tstring_end'>&#39;</span></span><span class='rparen'>)</span>
@@ -2671,7 +2671,6 @@
       <pre class="lines">
 
 
-443
 444
 445
 446
@@ -2679,10 +2678,11 @@
 448
 449
 450
-451</pre>
+451
+452</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 443</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 444</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_on_capture'>on_capture</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_mutex'>mutex</span><span class='period'>.</span><span class='id identifier rubyid_synchronize'>synchronize</span> <span class='kw'>do</span>
@@ -2713,14 +2713,14 @@
       <pre class="lines">
 
 
-453
 454
 455
 456
-457</pre>
+457
+458</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 453</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 454</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_on_capture='>on_capture=</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_mutex'>mutex</span><span class='period'>.</span><span class='id identifier rubyid_synchronize'>synchronize</span> <span class='kw'>do</span>
@@ -2747,7 +2747,6 @@
       <pre class="lines">
 
 
-459
 460
 461
 462
@@ -2755,10 +2754,11 @@
 464
 465
 466
-467</pre>
+467
+468</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 459</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 460</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_on_format'>on_format</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_mutex'>mutex</span><span class='period'>.</span><span class='id identifier rubyid_synchronize'>synchronize</span> <span class='kw'>do</span>
@@ -2789,14 +2789,14 @@
       <pre class="lines">
 
 
-469
 470
 471
 472
-473</pre>
+473
+474</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 469</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 470</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_on_format='>on_format=</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_mutex'>mutex</span><span class='period'>.</span><span class='id identifier rubyid_synchronize'>synchronize</span> <span class='kw'>do</span>
@@ -2823,7 +2823,6 @@
       <pre class="lines">
 
 
-212
 213
 214
 215
@@ -2843,10 +2842,10 @@
 229</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 212</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 213</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_override_exception_message'>override_exception_message</span><span class='lparen'>(</span><span class='id identifier rubyid_exception'>exception</span><span class='comma'>,</span> <span class='id identifier rubyid_binding_or_bindings'>binding_or_bindings</span><span class='rparen'>)</span>
-  <span class='kw'>return</span> <span class='kw'>nil</span> <span class='kw'>unless</span> <span class='id identifier rubyid_exception'>exception</span>
+  <span class='kw'>return</span> <span class='kw'>nil</span> <span class='kw'>unless</span> <span class='id identifier rubyid_exception'>exception</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_exception'>exception</span><span class='period'>.</span><span class='id identifier rubyid_respond_to?'>respond_to?</span><span class='lparen'>(</span><span class='symbol'>:message</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_rspec_binding'>rspec_binding</span> <span class='op'>=</span> <span class='op'>!</span><span class='lparen'>(</span><span class='id identifier rubyid_binding_or_bindings'>binding_or_bindings</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span> <span class='op'>||</span> <span class='id identifier rubyid_binding_or_bindings'>binding_or_bindings</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_exception_binding'>exception_binding</span> <span class='op'>=</span> <span class='lparen'>(</span><span class='id identifier rubyid_exception'>exception</span><span class='period'>.</span><span class='id identifier rubyid_binding_infos'>binding_infos</span><span class='period'>.</span><span class='id identifier rubyid_length'>length</span> <span class='op'>&gt;</span> <span class='int'>0</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_has_message'>has_message</span> <span class='op'>=</span> <span class='op'>!</span><span class='lparen'>(</span><span class='id identifier rubyid_exception'>exception</span><span class='period'>.</span><span class='id identifier rubyid_respond_to?'>respond_to?</span><span class='lparen'>(</span><span class='symbol'>:unaltered_message</span><span class='rparen'>)</span><span class='rparen'>)</span>
@@ -2861,7 +2860,6 @@
   <span class='id identifier rubyid_exception'>exception</span><span class='period'>.</span><span class='id identifier rubyid_define_singleton_method'>define_singleton_method</span><span class='lparen'>(</span><span class='symbol'>:message</span><span class='rparen'>)</span> <span class='kw'>do</span>
     <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_message_str'>message_str</span><span class='embexpr_end'>}</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_variable_str'>variable_str</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
   <span class='kw'>end</span>
-  <span class='id identifier rubyid_exception'>exception</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -2894,7 +2892,8 @@
 207
 208
 209
-210</pre>
+210
+211</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 199</span>
@@ -2905,11 +2904,12 @@
   <span class='kw'>when</span> <span class='kw'>nil</span>
     <span class='kw'>return</span> <span class='kw'>nil</span>
   <span class='kw'>when</span> <span class='const'>RSpec</span><span class='op'>::</span><span class='const'>Core</span><span class='op'>::</span><span class='const'>MultipleExceptionError</span>
-    <span class='id identifier rubyid_override_exception_message'>override_exception_message</span><span class='lparen'>(</span><span class='id identifier rubyid_exception_obj'>exception_obj</span><span class='period'>.</span><span class='id identifier rubyid_all_exceptions'>all_exceptions</span><span class='period'>.</span><span class='id identifier rubyid_first'>first</span><span class='comma'>,</span> <span class='id identifier rubyid_binding_or_bindings'>binding_or_bindings</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_exception_obj'>exception_obj</span><span class='period'>.</span><span class='id identifier rubyid_all_exceptions'>all_exceptions</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_exception'>exception</span><span class='op'>|</span>
+      <span class='id identifier rubyid_override_exception_message'>override_exception_message</span><span class='lparen'>(</span><span class='id identifier rubyid_exception'>exception</span><span class='comma'>,</span> <span class='id identifier rubyid_binding_or_bindings'>binding_or_bindings</span><span class='rparen'>)</span>
+    <span class='kw'>end</span>
   <span class='kw'>else</span>
     <span class='id identifier rubyid_override_exception_message'>override_exception_message</span><span class='lparen'>(</span><span class='id identifier rubyid_exception_obj'>exception_obj</span><span class='comma'>,</span> <span class='id identifier rubyid_binding_or_bindings'>binding_or_bindings</span><span class='rparen'>)</span>
   <span class='kw'>end</span>
-
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -3001,7 +3001,6 @@
       <pre class="lines">
 
 
-522
 523
 524
 525
@@ -3015,10 +3014,11 @@
 533
 534
 535
-536</pre>
+536
+537</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 522</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 523</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_running_in_ci?'>running_in_ci?</span>
   <span class='id identifier rubyid_mutex'>mutex</span><span class='period'>.</span><span class='id identifier rubyid_synchronize'>synchronize</span> <span class='kw'>do</span>
@@ -3144,12 +3144,14 @@
 314
 315
 316
-317</pre>
+317
+318</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 306</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_start_minitest_binding_capture'>start_minitest_binding_capture</span>
+  <span class='const'><span class='object_link'><a href="EnhancedExceptionContext.html" title="EnhancedExceptionContext (module)">EnhancedExceptionContext</a></span></span><span class='period'>.</span><span class='id identifier rubyid_clear_all'><span class='object_link'><a href="EnhancedExceptionContext.html#clear_all-instance_method" title="EnhancedExceptionContext#clear_all (method)">clear_all</a></span></span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='id identifier rubyid_enforce_capture_limit'>enforce_capture_limit</span>
   <span class='ivar'>@enabled</span> <span class='op'>=</span> <span class='kw'>true</span> <span class='kw'>if</span> <span class='ivar'>@enabled</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span>
   <span class='id identifier rubyid_mutex'>mutex</span><span class='period'>.</span><span class='id identifier rubyid_synchronize'>synchronize</span> <span class='kw'>do</span>
@@ -3181,7 +3183,6 @@
       <pre class="lines">
 
 
-341
 342
 343
 344
@@ -3218,10 +3219,11 @@
 375
 376
 377
-378</pre>
+378
+379</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 341</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 342</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_start_rspec_binding_capture'>start_rspec_binding_capture</span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='id identifier rubyid_enforce_capture_limit'>enforce_capture_limit</span>
@@ -3281,17 +3283,17 @@
       <pre class="lines">
 
 
-319
 320
 321
 322
 323
 324
 325
-326</pre>
+326
+327</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 319</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 320</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_stop_minitest_binding_capture'>stop_minitest_binding_capture</span>
   <span class='id identifier rubyid_disable_capturing!'>disable_capturing!</span> <span class='kw'>if</span> <span class='id identifier rubyid_capture_limit_exceeded?'>capture_limit_exceeded?</span>
@@ -3321,7 +3323,6 @@
       <pre class="lines">
 
 
-380
 381
 382
 383
@@ -3331,10 +3332,11 @@
 387
 388
 389
-390</pre>
+390
+391</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 380</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 381</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_stop_rspec_binding_capture'>stop_rspec_binding_capture</span>
   <span class='id identifier rubyid_disable_capturing!'>disable_capturing!</span> <span class='kw'>if</span> <span class='id identifier rubyid_capture_limit_exceeded?'>capture_limit_exceeded?</span>
@@ -3344,7 +3346,7 @@
     <span class='id identifier rubyid_binding_info'>binding_info</span> <span class='op'>=</span> <span class='id identifier rubyid_convert_binding_to_binding_info'>convert_binding_to_binding_info</span><span class='lparen'>(</span><span class='ivar'>@rspec_example_binding</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='ivar'>@rspec_example_binding</span>
     <span class='ivar'>@capture_next_binding</span> <span class='op'>=</span> <span class='kw'>false</span>
     <span class='ivar'>@rspec_example_binding</span> <span class='op'>=</span> <span class='kw'>nil</span>
-    <span class='id identifier rubyid_binding_info'>binding_info</span>
+    <span class='kw'>return</span> <span class='id identifier rubyid_binding_info'>binding_info</span>
   <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -3367,15 +3369,15 @@
       <pre class="lines">
 
 
-550
 551
 552
 553
 554
-555</pre>
+555
+556</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 550</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced_errors.rb', line 551</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_validate_binding_format'>validate_binding_format</span><span class='lparen'>(</span><span class='id identifier rubyid_binding_info'>binding_info</span><span class='rparen'>)</span>
   <span class='kw'>unless</span> <span class='id identifier rubyid_binding_info'>binding_info</span><span class='period'>.</span><span class='id identifier rubyid_keys'>keys</span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='symbol'>:capture_event</span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_binding_info'>binding_info</span><span class='lbracket'>[</span><span class='symbol'>:variables</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>Hash</span><span class='rparen'>)</span>
@@ -3393,7 +3395,7 @@
 </div>
 
       <div id="footer">
-  Generated on Mon Dec 16 11:33:57 2024 by
+  Generated on Tue Dec 17 14:09:26 2024 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.37 (ruby-3.3.6).
 </div>
