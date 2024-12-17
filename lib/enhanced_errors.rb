@@ -286,8 +286,8 @@ class EnhancedErrors
     end
 
     def start_minitest_binding_capture
-      EnhancedExceptionContext.clear_all
       @enabled = true if @enabled.nil?
+      return unless @enabled
       mutex.synchronize do
         @minitest_trace = TracePoint.new(:return) do |tp|
           next unless tp.method_id.to_s.start_with?('test_') && is_a_minitest?(tp.defined_class)
@@ -321,6 +321,8 @@ class EnhancedErrors
 
     def start_rspec_binding_capture
       @enabled = true if @enabled.nil?
+      return unless @enabled
+
       mutex.synchronize do
         @rspec_example_binding = nil
         @capture_next_binding = false
