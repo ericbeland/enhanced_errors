@@ -24,7 +24,7 @@ class EnhancedErrors
     attr_accessor :enabled, :config_block, :on_capture_hook, :eligible_for_capture, :exception_trace, :override_messages
 
     GEMS_REGEX = %r{[\/\\]gems[\/\\]}
-    DEFAULT_MAX_LENGTH = 2000
+    DEFAULT_MAX_CAPTURE_LENGTH = 2500
     MAX_BINDING_INFOS = 3
 
     RSPEC_SKIP_LIST = [
@@ -87,7 +87,7 @@ class EnhancedErrors
     RSPEC_HANDLER_NAMES = ['RSpec::Expectations::PositiveExpectationHandler', 'RSpec::Expectations::NegativeExpectationHandler']
 
     @enabled = nil
-    @max_length = nil
+    @max_capture_length = nil
     @capture_rescue = nil
     @skip_list = nil
     @capture_events = nil
@@ -131,16 +131,19 @@ class EnhancedErrors
       mutex.synchronize { @max_capture_events || -1 }
     end
 
+
+    def max_capture_length
+      mutex.synchronize { @max_capture_length || DEFAULT_MAX_CAPTURE_LENGTH }
+    end
+
+    def max_capture_length=(val)
+      mutex.synchronize { @max_capture_length = value }
+    end
+
     def max_capture_events=(value)
       mutex.synchronize do
         @max_capture_events = value
       end
-    end
-
-    def enforce_capture_limit
-      exceeded = capture_limit_exceeded?
-      disable_capturing! if capture_limit_exceeded?
-      exceeded
     end
 
     def capture_limit_exceeded?
@@ -158,13 +161,6 @@ class EnhancedErrors
       end
     end
 
-    def increment_capture_events_count
-      mutex.synchronize do
-        @capture_events_count ||= 0
-        @max_capture_events ||= -1
-        @capture_events_count += 1
-      end
-    end
 
     def reset!
       mutex.synchronize do
@@ -176,17 +172,6 @@ class EnhancedErrors
         @exception_trace = nil
         @capture_events_count = 0
         @enabled = true
-      end
-    end
-
-    def max_length(value = nil)
-      mutex.synchronize do
-        if value.nil?
-          @max_length ||= DEFAULT_MAX_LENGTH
-        else
-          @max_length = value
-        end
-        @max_length
       end
     end
 
@@ -212,16 +197,13 @@ class EnhancedErrors
 
     def override_exception_message(exception, binding_or_bindings)
       return nil unless exception && exception.respond_to?(:message)
-      rspec_binding = !(binding_or_bindings.nil? || binding_or_bindings.empty?)
+      test_binding = !(binding_or_bindings.nil? || binding_or_bindings.empty?)
       exception_binding = (exception.binding_infos.length > 0)
       has_message = !(exception.respond_to?(:unaltered_message))
-      return nil unless (rspec_binding || exception_binding) && has_message
+      return nil unless (test_binding || exception_binding) && has_message
 
       variable_str = EnhancedErrors.format(binding_or_bindings)
       message_str = exception.message
-      if exception.respond_to?(:captured_variables) && !message_str.include?(exception.captured_variables)
-        message_str += exception.captured_variables
-      end
       exception.define_singleton_method(:unaltered_message) { message_str }
       exception.define_singleton_method(:message) do
         "#{message_str}#{variable_str}"
@@ -305,13 +287,11 @@ class EnhancedErrors
 
     def start_minitest_binding_capture
       EnhancedExceptionContext.clear_all
-      return if enforce_capture_limit
       @enabled = true if @enabled.nil?
       mutex.synchronize do
         @minitest_trace = TracePoint.new(:return) do |tp|
           next unless tp.method_id.to_s.start_with?('test_') && is_a_minitest?(tp.defined_class)
           @minitest_test_binding = tp.binding
-          increment_capture_events_count
         end
         @minitest_trace.enable
       end
@@ -340,7 +320,6 @@ class EnhancedErrors
     end
 
     def start_rspec_binding_capture
-      return if enforce_capture_limit
       @enabled = true if @enabled.nil?
       mutex.synchronize do
         @rspec_example_binding = nil
@@ -358,10 +337,8 @@ class EnhancedErrors
               next
             end
             next unless @capture_next_binding
-
             if @capture_next_binding == :next || @capture_next_binding == :next_matching && is_rspec_example?(tp)
               @capture_next_binding = false
-              increment_capture_events_count
               @rspec_example_binding = tp.binding
             end
           elsif tp.event == :raise
@@ -588,7 +565,7 @@ class EnhancedErrors
       end
 
       mutex.synchronize do
-        max_len = @max_length || DEFAULT_MAX_LENGTH
+        max_len = @max_capture_length || DEFAULT_MAX_CAPTURE_LENGTH
         if result.length > max_len
           result = result[0...max_len] + "... (truncated)"
         end
@@ -606,7 +583,6 @@ class EnhancedErrors
     def handle_tracepoint_event(tp)
       # Check enabled outside the synchronized block for speed, but still safe due to re-check inside.
       return unless enabled
-      return if enforce_capture_limit
       return if Thread.current[:enhanced_errors_processing] || Thread.current[:on_capture] || ignored_exception?(tp.raised_exception)
 
       Thread.current[:enhanced_errors_processing] = true
@@ -682,7 +658,6 @@ class EnhancedErrors
 
       if binding_info
         binding_info = validate_binding_format(binding_info)
-        increment_capture_events_count
         if binding_info && exception.binding_infos.length >= MAX_BINDING_INFOS
           exception.binding_infos.delete_at(MAX_BINDING_INFOS / 2.round)
         end

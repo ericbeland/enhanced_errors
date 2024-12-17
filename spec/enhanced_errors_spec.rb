@@ -291,11 +291,11 @@ RSpec.describe EnhancedErrors do
     end
 
     context 'output truncation' do
-      it 'truncates output according to max_length' do
+      it 'truncates output according to max_capture_length' do
         @large_variable = 'a' * 5000
 
         EnhancedErrors.enhance_exceptions! do
-          max_length 1000
+          max_capture_length = 1000
         end
 
         expect {
@@ -884,130 +884,5 @@ RSpec.describe EnhancedErrors do
     end
   end
 
-
-
 end
 
-
-RSpec.describe EnhancedErrors, 'max_capture_events functionality' do
-  before(:each) do
-    # Fully reset the environment before each test
-    EnhancedErrors.enhance_exceptions!(enabled: false)
-    EnhancedErrors.reset!
-    EnhancedErrors.max_capture_events = -1
-    EnhancedErrors.exception_trace = nil
-
-    # Re-enable with a restricted eligible_for_capture
-    EnhancedErrors.enhance_exceptions!(enabled: true, override_messages: false) do
-      # Only capture exceptions that start with known test phrases to avoid interference
-      eligible_for_capture do |ex|
-        ex.is_a?(StandardError) && ex.message =~ /^(Test|First|Second|Third|Hit|Now capturing|Exception)/
-      end
-    end
-  end
-
-  after(:each) do
-    # Disable after each test to avoid state leaking into subsequent tests
-    EnhancedErrors.enhance_exceptions!(enabled: false)
-    EnhancedErrors.reset!
-    EnhancedErrors.max_capture_events = -1
-    EnhancedErrors.exception_trace = nil
-  end
-
-  it 'disables capturing after exceeding the max capture limit' do
-    EnhancedErrors.max_capture_events = 2
-    expect(EnhancedErrors.capture_events_count).to eq(0)
-
-    # Raise first exception
-    expect {
-      raise 'First exception'
-    }.to raise_error(StandardError)
-    expect(EnhancedErrors.capture_events_count).to eq(1)
-
-    # Raise second exception
-    expect {
-      raise 'Second exception'
-    }.to raise_error(StandardError)
-    expect(EnhancedErrors.capture_events_count).to eq(2)
-
-    # Raise third exception - should exceed limit and disable capturing
-    expect {
-      raise 'Third exception'
-    }.to raise_error(StandardError)
-
-    # Capturing should be disabled now, no increment
-    expect(EnhancedErrors.capture_events_count).to eq(2)
-    expect(EnhancedErrors.enabled).to be false
-  end
-
-  it 'does not increase capture_events_count once disabled' do
-    EnhancedErrors.max_capture_events = 1
-
-    # Hit the limit
-    expect {
-      raise 'Test exception'
-    }.to raise_error(StandardError)
-    expect(EnhancedErrors.capture_events_count).to eq(1)
-
-
-    # Another exception should not increment the count
-    expect {
-      raise 'Test exception'
-    }.to raise_error(StandardError)
-    expect(EnhancedErrors.capture_events_count).to eq(1)
-    expect(EnhancedErrors.enabled).to be false
-  end
-
-  it 'resets capture_events_count to 0 and allows capturing again' do
-    EnhancedErrors.max_capture_events = 1
-
-    # Hit the limit
-    expect {
-      raise 'Hit the limit'
-    }.to raise_error(StandardError)
-    expect(EnhancedErrors.capture_events_count).to eq(1)
-
-    expect {
-      raise 'Hit the limit'
-    }.to raise_error(StandardError)
-
-    expect(EnhancedErrors.capture_events_count).to eq(1)
-    # Reset the count
-    EnhancedErrors.reset!
-    expect(EnhancedErrors.capture_events_count).to eq(0)
-    EnhancedErrors.max_capture_events = 1
-    EnhancedErrors.enhance_exceptions!
-    EnhancedErrors.max_capture_events = 1
-    expect(EnhancedErrors.enabled).to be true
-    # Now we should be able to capture again
-    expect {
-      raise 'Now capturing again'
-    }.to raise_error(StandardError)
-    expect(EnhancedErrors.capture_events_count).to eq(1)
-
-    expect {
-      raise 'Now capturing again'
-    }.to raise_error(StandardError)
-    expect(EnhancedErrors.capture_events_count).to eq(1)
-    # Should be disabled again after hitting the limit
-    expect(EnhancedErrors.enabled).to be false
-  end
-
-  it 'allows unlimited capturing when max_capture_events = -1' do
-    EnhancedErrors.reset!
-    expect(EnhancedErrors.capture_events_count).to eq(0)
-    EnhancedErrors.enhance_exceptions!
-
-    # this is doubled as each raise is both an RSpec expectation
-    # failure, and also a StandardError
-    5.times do |i|
-      expect {
-        raise "Exception #{i}"
-      }.to raise_error(StandardError)
-    end
-
-    # With unlimited capturing, count should equal number of captures
-    expect(EnhancedErrors.capture_events_count).to eq(5)
-    expect(EnhancedErrors.enabled).to be true
-  end
-end

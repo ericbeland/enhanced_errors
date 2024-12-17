@@ -200,7 +200,7 @@ You can pass configuration options to `enhance_exceptions!`:
 
 ```ruby
 
-EnhancedErrors.enhance_exceptions!(enabled: true, max_length: 2000) do
+EnhancedErrors.enhance_exceptions!(enabled: true, max_capture_length: 2000) do
   # Additional configuration here
   add_to_skip_list :@instance_variable_to_skip, :local_to_skip
 end
@@ -208,7 +208,7 @@ end
 ```
 - `add_to_skip_list`: Variables to ignore, as symbols. ex:  :@instance_variable_to_skip, :local_to_skip`
 - `enabled`: Enables or disables the enhancement (default: `true`).
-- `max_length`: Sets the maximum length of the captured_variables string (default: `2500`).
+- `max_capture_length`: Sets the maximum length of the captured_variables string (default: `2500`).
 
 
 ### Environment-Based Defaults
