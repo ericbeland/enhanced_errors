@@ -1,6 +1,16 @@
 # exception.rb
+require_relative 'enhanced_exception_context'
 
-class Exception
+module ExceptionBindingInfos
+  def binding_infos
+    ctx = EnhancedExceptionContext.context_for(self)
+    unless ctx
+      ctx = Context.new
+      EnhancedExceptionContext.store_context(self, ctx)
+    end
+    ctx.binding_infos
+  end
+
   def captured_variables
     if binding_infos.any?
       bindings_of_interest = select_binding_infos
@@ -10,10 +20,6 @@ class Exception
     end
   rescue
     ''
-  end
-
-  def binding_infos
-    @binding_infos ||= []
   end
 
   private
@@ -42,4 +48,8 @@ class Exception
 
     bindings_of_interest.compact
   end
+end
+
+class Exception
+  prepend ExceptionBindingInfos
 end

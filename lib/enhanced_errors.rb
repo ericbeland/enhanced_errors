@@ -202,15 +202,16 @@ class EnhancedErrors
       when nil
         return nil
       when RSpec::Core::MultipleExceptionError
-        override_exception_message(exception_obj.all_exceptions.first, binding_or_bindings)
+        exception_obj.all_exceptions.each do |exception|
+          override_exception_message(exception, binding_or_bindings)
+        end
       else
         override_exception_message(exception_obj, binding_or_bindings)
       end
-
     end
 
     def override_exception_message(exception, binding_or_bindings)
-      return nil unless exception
+      return nil unless exception && exception.respond_to?(:message)
       rspec_binding = !(binding_or_bindings.nil? || binding_or_bindings.empty?)
       exception_binding = (exception.binding_infos.length > 0)
       has_message = !(exception.respond_to?(:unaltered_message))
@@ -225,7 +226,6 @@ class EnhancedErrors
       exception.define_singleton_method(:message) do
         "#{message_str}#{variable_str}"
       end
-      exception
     end
 
     def add_to_skip_list(*vars)
@@ -304,6 +304,7 @@ class EnhancedErrors
     end
 
     def start_minitest_binding_capture
+      EnhancedExceptionContext.clear_all
       return if enforce_capture_limit
       @enabled = true if @enabled.nil?
       mutex.synchronize do
@@ -385,7 +386,7 @@ class EnhancedErrors
         binding_info = convert_binding_to_binding_info(@rspec_example_binding) if @rspec_example_binding
         @capture_next_binding = false
         @rspec_example_binding = nil
-        binding_info
+        return binding_info
       end
     end
 

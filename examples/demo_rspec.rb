@@ -14,10 +14,6 @@ RSpec.configure do |config|
     EnhancedErrors.start_rspec_binding_capture
   end
 
-  config.before(:example) do |_example|
-    EnhancedErrors.start_rspec_binding_capture
-  end
-
   config.after(:example) do |example|
     EnhancedErrors.override_rspec_message(example, EnhancedErrors.stop_rspec_binding_capture)
   end

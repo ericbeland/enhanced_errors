@@ -135,6 +135,7 @@ RSpec.describe EnhancedErrors do
       end
     end
 
+
     context 'environment defaults' do
       it 'applies correct defaults based on environment' do
         ENV['RAILS_ENV'] = 'development'
@@ -849,6 +850,7 @@ RSpec.describe EnhancedErrors do
           end
         end
       end
+
 
       context 'variables that raise exceptions when inspected' do
         it 'handles variables that raise exceptions when inspected' do
