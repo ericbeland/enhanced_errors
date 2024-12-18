@@ -7,11 +7,9 @@ require 'monitor'
 require_relative 'enhanced/colors'
 require_relative 'enhanced/exception'
 
-IGNORED_EXCEPTIONS = %w[SystemExit NoMemoryError SignalException Interrupt
- ScriptError LoadError NotImplementedError SyntaxError
- RSpec::Expectations::ExpectationNotMetError
- RSpec::Matchers::BuiltIn::RaiseError
- SystemStackError Psych::BadAlias]
+IGNORED_EXCEPTIONS = %w[SystemExit NoMemoryError SignalException Interrupt ScriptError LoadError
+NotImplementedError SyntaxError RSpec::Expectations::ExpectationNotMetError
+RSpec::Matchers::BuiltIn::RaiseError SystemStackError Psych::BadAlias]
 
 class EnhancedErrors
   extend ::Enhanced
@@ -24,8 +22,8 @@ class EnhancedErrors
     attr_accessor :enabled, :config_block, :on_capture_hook, :eligible_for_capture, :exception_trace, :override_messages
 
     GEMS_REGEX = %r{[\/\\]gems[\/\\]}
-    DEFAULT_MAX_CAPTURE_LENGTH = 2500
-    MAX_BINDING_INFOS = 3
+    DEFAULT_MAX_CAPTURE_LENGTH = 2200
+    MAX_BINDING_INFOS = 2
 
     RSPEC_SKIP_LIST = [
       :@__inspect_output,
@@ -86,6 +84,16 @@ class EnhancedErrors
 
     RSPEC_HANDLER_NAMES = ['RSpec::Expectations::PositiveExpectationHandler', 'RSpec::Expectations::NegativeExpectationHandler']
 
+    CI_ENV_VARS = {
+      'CI' => ENV['CI'],
+      'JENKINS' => ENV['JENKINS'],
+      'GITHUB_ACTIONS' => ENV['GITHUB_ACTIONS'],
+      'CIRCLECI' => ENV['CIRCLECI'],
+      'TRAVIS' => ENV['TRAVIS'],
+      'APPVEYOR' => ENV['APPVEYOR'],
+      'GITLAB_CI' => ENV['GITLAB_CI']
+    }
+
     @enabled = nil
     @max_capture_length = nil
     @capture_rescue = nil
@@ -97,10 +105,6 @@ class EnhancedErrors
     @original_global_variables = nil
     @exception_trace = nil
     @override_messages = nil
-
-    # Default values
-    @max_capture_events = -1 # -1 means no limit
-    @capture_events_count = 0
 
     # Thread-safe getters and setters
     def enabled=(val)
@@ -119,37 +123,12 @@ class EnhancedErrors
       mutex.synchronize { @capture_rescue }
     end
 
-    def capture_events_count
-      mutex.synchronize { @capture_events_count || 0 }
-    end
-
-    def capture_events_count=(val)
-      mutex.synchronize { @capture_events_count = val }
-    end
-
-    def max_capture_events
-      mutex.synchronize { @max_capture_events || -1 }
-    end
-
-
     def max_capture_length
       mutex.synchronize { @max_capture_length || DEFAULT_MAX_CAPTURE_LENGTH }
     end
 
     def max_capture_length=(val)
       mutex.synchronize { @max_capture_length = value }
-    end
-
-    def max_capture_events=(value)
-      mutex.synchronize do
-        @max_capture_events = value
-      end
-    end
-
-    def capture_limit_exceeded?
-      mutex.synchronize do
-       max_capture_events > 0 && capture_events_count >= max_capture_events
-      end
     end
 
     def disable_capturing!
@@ -170,7 +149,6 @@ class EnhancedErrors
         @rspec_tracepoint = nil
         @minitest_trace = nil
         @exception_trace = nil
-        @capture_events_count = 0
         @enabled = true
       end
     end
@@ -224,14 +202,8 @@ class EnhancedErrors
         @output_format = nil
         @eligible_for_capture = nil
         @original_global_variables = nil
+
         @override_messages = override_messages
-
-        # Ensure these are not nil
-        if @max_capture_events.nil?
-          @max_capture_events = -1
-        end
-        @capture_events_count ||= 0
-
         @rspec_failure_message_loaded = true
 
         @enabled = enabled
@@ -252,32 +224,12 @@ class EnhancedErrors
 
         validate_and_set_capture_events(capture_events)
 
-        # If max_capture_events == 0, capturing is off from the start.
-        if @max_capture_events == 0
-          @enabled = false
-          return
-        end
-
         events = @capture_events ? @capture_events.to_a : default_capture_events
         @exception_trace = TracePoint.new(*events) do |tp|
           handle_tracepoint_event(tp)
         end
 
-        # Only enable trace if still enabled and not limited
-        if @enabled && (@max_capture_events == -1 || @capture_events_count < @max_capture_events)
-          @exception_trace.enable
-        end
-      end
-    end
-
-    def safe_prepend_module(target_class, mod)
-      mutex.synchronize do
-        if defined?(target_class) && target_class.is_a?(Module)
-          target_class.prepend(mod)
-          true
-        else
-          false
-        end
+        @exception_trace.enable if @enabled
       end
     end
 
@@ -286,6 +238,7 @@ class EnhancedErrors
     end
 
     def start_minitest_binding_capture
+      EnhancedExceptionContext.clear_all
       @enabled = true if @enabled.nil?
       return unless @enabled
       mutex.synchronize do
@@ -298,7 +251,6 @@ class EnhancedErrors
     end
 
     def stop_minitest_binding_capture
-      disable_capturing! if capture_limit_exceeded?
       mutex.synchronize do
         @minitest_trace&.disable
         @minitest_trace = nil
@@ -320,6 +272,7 @@ class EnhancedErrors
     end
 
     def start_rspec_binding_capture
+      EnhancedExceptionContext.clear_all
       @enabled = true if @enabled.nil?
       return unless @enabled
 
@@ -358,7 +311,6 @@ class EnhancedErrors
     end
 
     def stop_rspec_binding_capture
-      disable_capturing! if capture_limit_exceeded?
       mutex.synchronize do
         @rspec_tracepoint&.disable
         @rspec_tracepoint = nil
@@ -502,16 +454,8 @@ class EnhancedErrors
     def running_in_ci?
       mutex.synchronize do
         return @running_in_ci if defined?(@running_in_ci)
-        ci_env_vars = {
-          'CI' => ENV['CI'],
-          'JENKINS' => ENV['JENKINS'],
-          'GITHUB_ACTIONS' => ENV['GITHUB_ACTIONS'],
-          'CIRCLECI' => ENV['CIRCLECI'],
-          'TRAVIS' => ENV['TRAVIS'],
-          'APPVEYOR' => ENV['APPVEYOR'],
-          'GITLAB_CI' => ENV['GITLAB_CI']
-        }
-        @running_in_ci = ci_env_vars.any? { |_, value| value.to_s.downcase == 'true' }
+
+        @running_in_ci = CI_ENV_VARS.any? { |_, value| value.to_s.downcase == 'true' }
       end
     end
 

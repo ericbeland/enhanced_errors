@@ -641,7 +641,7 @@ RSpec.describe EnhancedErrors do
             # EnhancedErrors processes the exception here
           end
         end
-        expect(exception.binding_infos.size).to eq(3)
+        expect(exception.binding_infos.size).to eq(2)
       ensure
         EnhancedErrors.enhance_exceptions!(enabled: false)
       end
