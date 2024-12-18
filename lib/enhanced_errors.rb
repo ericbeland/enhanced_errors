@@ -161,25 +161,22 @@ class EnhancedErrors
 
     def override_rspec_message(example, binding_or_bindings)
       exception_obj = example.exception
-      case exception_obj
-      when nil
-        return nil
-      when RSpec::Core::MultipleExceptionError
+      return if exception_obj.nil?
+
+      from_bindings = [binding_or_bindings].flatten.compact
+      case exception_obj.class.to_s
+      when 'RSpec::Core::MultipleExceptionError'
         exception_obj.all_exceptions.each do |exception|
-          override_exception_message(exception, binding_or_bindings)
+          override_exception_message(exception, from_bindings + exception.binding_infos)
         end
-      else
+      when 'RSpec::Expectations::ExpectationNotMetError'
         override_exception_message(exception_obj, binding_or_bindings)
+      else
+        override_exception_message(exception_obj, from_bindings + exception_obj.binding_infos)
       end
     end
 
     def override_exception_message(exception, binding_or_bindings)
-      return nil unless exception && exception.respond_to?(:message)
-      test_binding = !(binding_or_bindings.nil? || binding_or_bindings.empty?)
-      exception_binding = (exception.binding_infos.length > 0)
-      has_message = !(exception.respond_to?(:unaltered_message))
-      return nil unless (test_binding || exception_binding) && has_message
-
       variable_str = EnhancedErrors.format(binding_or_bindings)
       message_str = exception.message
       exception.define_singleton_method(:unaltered_message) { message_str }
@@ -281,34 +278,36 @@ class EnhancedErrors
         @capture_next_binding = false
         @rspec_tracepoint&.disable
 
-        @rspec_tracepoint = TracePoint.new(:raise, :b_return) do |tp|
-          # puts "name #{tp.raised_exception.class.name rescue ''} method:#{tp.method_id} tp.binding:#{tp.binding.local_variables rescue ''}"
-          # puts "event: #{tp.event} defined_class#{class_to_string(tp.defined_class)} #{tp.path}:#{tp.lineno} #{tp.callee_id} "
-          # This trickery below is to help us identify the anonymous block return we want to grab
-          # Very kluge-y and edge cases have grown it, but it works
-          if tp.event == :b_return
-            if RSPEC_HANDLER_NAMES.include?(class_to_string(tp.defined_class))
-              @capture_next_binding = :next
-              next
-            end
-            next unless @capture_next_binding
-            if @capture_next_binding == :next || @capture_next_binding == :next_matching && is_rspec_example?(tp)
-              @capture_next_binding = false
-              @rspec_example_binding = tp.binding
-            end
-          elsif tp.event == :raise
+        @rspec_tracepoint = TracePoint.new(:raise) do |tp|
             class_name = tp.raised_exception.class.name
             case class_name
             when 'RSpec::Expectations::ExpectationNotMetError'
-              @capture_next_binding = :next_matching
+              start_rspec_binding_trap
             else
               handle_tracepoint_event(tp)
             end
           end
         end
         @rspec_tracepoint.enable
-      end
     end
+
+    # grab the next rspec binding that goes by, and then stop the expensive listening trace
+    def start_rspec_binding_trap
+      @rspec_binding_trap = TracePoint.new(:b_return) do |tp|
+        # kluge-y hack and will be a pain to maintain
+        if tp.callee_id == :handle_matcher
+          @capture_next_binding = :next
+          next
+        end
+        next unless @capture_next_binding
+        @capture_next_binding = false
+        @rspec_example_binding = tp.binding
+        @rspec_binding_trap.disable
+        @rspec_binding_trap = nil
+      end
+      @rspec_binding_trap.enable
+    end
+
 
     def stop_rspec_binding_capture
       mutex.synchronize do
