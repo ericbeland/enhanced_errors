@@ -34,11 +34,10 @@ end
 
 
 
-The RSpec test-time only approach constrained only to test-time.
 
 ### RSpec Setup
 
-Use EnhancedErrors with RSpec for test-specific exception capturing, ideal for CI and local testing without impacting production.
+Use EnhancedErrors with RSpec for test-specific exception capturing, ideal for CI and local spec runs.
 
 ```ruby
 
@@ -106,16 +105,18 @@ EnhancedErrors can append the captured variable description onto every Exception
 EnhancedErrors.enhance_exceptions(override_messages: true)
 ```
 
-This captures unanticipated exceptions without modifying all your error handlers. 
-This approach can be used to get detailed logs when problems happen in something like a cron-job.
+This captures unanticipated exceptions without modifying all your error handlers, and crucially will
+generally output them for you by virtue of injecting itself into the .message.
 
-The tradeoff of this approach is that if you have expectations in your tests/specs around 
-exception messages, those may break. Also, if you are doing something like storing the errors
-in a database, they could be *much* longer and that may pose an issue on field lengths.
+This approach can be used to get detailed logs when problems happen in something like a cron-job. It also 
+makes the logged rails error messages have full context.
+
+The tradeoff of this approach, at test time, is that if you have previously built expectations in your tests/specs around 
+exact exception messages, those may break. Also, if you are doing something like storing errors
+in a database, they will be *much* longer and that may pose an issue on field lengths.
 Or if you are writing your logs to Datadog, New Relic, Splunk, etc, log messages for 
-errors will be longer, and you should consider what data/PII you are sharing.
+errors will be longer, and you should consider what data/PII you are sharing inadvertently.
 
-Ideally, use exception.captured_variables instead.
 
 ```ruby
 EnhancedErrors.enhance_exceptions!(override_messages: true)
@@ -135,11 +136,11 @@ EnhancedErrors.enhance_exceptions!(override_messages: true)
 - **Customizable Output**: Supports multiple output formats (`:json`, `:plaintext`, `:terminal`).
 - **Flexible Hooks**: Redact or modifying captured data via the `on_capture` hook. Update the final string with on_format.
 - **Environment-Based Defaults**: For Rails apps, automatically adjusts settings based on the environment (`development`, `test`, `production`, `ci`).
-- **Pre-Populated Skip List**: Comes with predefined skip lists to exclude irrelevant variables from being captured.
+- **Pre-Populated Skip List**: Comes with predefined skip lists to exclude irrelevant variables from being captured. Noisy/huge items are skipped by default.
 - **Capture Levels**: Supports `info` and `debug` levels, where `debug` level ignores the skip lists for more comprehensive data capture.
 - **Capture Types**: Captures variables from the first `raise` and the last `rescue` for an exception by default.
-- **No dependencies**:  EnhancedErrors does not ___require___ any dependencies--it uses [awesome_print](https://github.com/awesome-print/awesome_print) for nicer output if it is installed and available.
-- **Lightweight**: Minimal performance impact, as tracing is only active during exception raising.
+- **No dependencies**:  EnhancedErrors does not ___require___ any dependencies--it uses [awesome_print](https://github.com/awesome-print/awesome_print) for nicer output in dev/terminal mode if it is installed and available.
+- **Lightweight**: Minimal performance impact in regular ruby, as tracing is active only during exception raise. Low/minimal usage in RSpec.
 
 EnhancedErrors use-cases:
 
