@@ -193,6 +193,7 @@ class EnhancedErrors
 
     def enhance_exceptions!(enabled: true, debug: false, capture_events: nil, override_messages: false, **options, &block)
       mutex.synchronize do
+        ensure_extensions_are_required
         @exception_trace&.disable
         @exception_trace = nil
 
@@ -235,6 +236,7 @@ class EnhancedErrors
     end
 
     def start_minitest_binding_capture
+      ensure_extensions_are_required
       EnhancedExceptionContext.clear_all
       @enabled = true if @enabled.nil?
       return unless @enabled
@@ -269,6 +271,7 @@ class EnhancedErrors
     end
 
     def start_rspec_binding_capture
+      ensure_extensions_are_required
       EnhancedExceptionContext.clear_all
       @enabled = true if @enabled.nil?
       return unless @enabled
@@ -803,5 +806,18 @@ class EnhancedErrors
       rspec = exception.class.name.start_with?('RSpec::Matchers')
       !ignored && !rspec
     end
+
+    # This prevents loading it for say, production, if you don't want to,
+    # and keeps things cleaner. It allows a path to put this behind a feature-flag
+    # or env variable, and dynamically enable some capture instrumentation only
+    # when a Heisenbug is being hunted.
+    def ensure_extensions_are_required
+      mutex.synchronize do
+        return if @loaded_required_extensions
+        require_relative 'enhanced/exception'
+        @loaded_required_extensions = true
+      end
+    end
+
   end
 end
