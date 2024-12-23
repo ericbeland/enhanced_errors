@@ -435,11 +435,7 @@ class EnhancedErrors
         env = ENV['RAILS_ENV'] || ENV['RACK_ENV'] || 'development'
         @output_format = case env
                          when 'development', 'test'
-                           if running_in_ci?
-                             :plaintext
-                           else
-                             :terminal
-                           end
+                           running_in_ci? ? :plaintext : :terminal
                          when 'production'
                            :json
                          else
