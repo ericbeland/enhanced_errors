@@ -793,6 +793,144 @@ RSpec.describe EnhancedErrors do
       end
     end
 
+    context 'Edge case tests for unusual objects' do
+      # 1. BasicObject that doesn’t define respond_to?
+      context 'raising exception from a BasicObject descendant' do
+        let(:basic_object_class) do
+          Class.new(BasicObject) do
+            def raise_error
+              ::Kernel.raise ::RuntimeError, 'Error from a BasicObject descendant'
+            end
+          end
+        end
+
+        it 'handles exceptions from a BasicObject descendant with no respond_to?' do
+          obj = basic_object_class.new
+          expect {
+            obj.raise_error
+          }.to raise_error(RuntimeError, 'Error from a BasicObject descendant') do |e|
+            expect(e.binding_infos).not_to be_nil
+            # Just ensure EnhancedErrors didn't choke on missing respond_to?
+            expect(e.captured_variables).to include('[ErrorGettingName]')
+          end
+        end
+      end
+
+      # 2. Object that responds to all method calls via method_missing
+      context 'raising exception from an object that uses method_missing for everything' do
+        let(:method_missing_class) do
+          Class.new do
+            def method_missing(method_name, *args, &block)
+              @bar = 'baz'
+              raise "You called #{method_name} with #{args.inspect}"
+            end
+
+            def respond_to_missing?(method_name, include_private = false)
+              true
+            end
+          end
+        end
+
+        it 'handles exceptions from an object that responds to everything via method_missing' do
+          obj = method_missing_class.new
+          expect {
+            @inst = "FooYa"
+            obj.some_random_method(42)
+          }.to raise_error(RuntimeError, /You called some_random_method with \[42\]/) do |e|
+            expect(e.binding_infos).not_to be_nil
+            # Ensure we can still handle the captured variables
+            # even though the object claims to respond to everything
+            expect(e.captured_variables).to include('Instances:')
+          end
+        end
+      end
+
+      # 3. Raising exception from a singleton class object
+      context 'raising exception from an object’s singleton class' do
+        it 'handles exceptions from a singleton class method' do
+          obj = Object.new
+          singleton_class = class << obj; self; end
+          singleton_class.send(:define_method, :raise_from_singleton) do
+            raise 'Error from singleton class method'
+          end
+
+          expect {
+            obj.raise_from_singleton
+          }.to raise_error(RuntimeError, 'Error from singleton class method') do |e|
+            expect(e.binding_infos).not_to be_empty
+            # We expect the method_and_args[:object_name] to reflect the singleton class
+            expect(e.binding_infos.last[:method_and_args][:object_name]).to match(/#<Object:.+>.raise_from_singleton/)
+          end
+        end
+      end
+
+      # 4. Object that overrides #class and #class.name
+      context 'raising exception from an object that overrides #class and #class.name' do
+        let(:tricky_class) do
+          Class.new do
+            def class
+              'FakeClass'
+            end
+
+            def self.name
+              'TrickyClassName'
+            end
+
+            def raise_error
+              raise 'Error from object overriding #class and #class.name'
+            end
+          end
+        end
+
+        it 'handles an object that reports a fake class' do
+          obj = tricky_class.new
+          expect {
+            obj.raise_error
+          }.to raise_error(RuntimeError, 'Error from object overriding #class and #class.name') do |e|
+            expect(e.binding_infos).not_to be_nil
+            # Ensure that the code doesn't explode when calling e.binding_infos
+            # even though #class and #class.name are not returning typical values
+            expect(e.captured_variables).to include('[ErrorGettingName]')
+          end
+        end
+      end
+
+      # 5. Object that overrides #instance_variables
+      context 'raising exception from an object overriding #instance_variables' do
+        let(:custom_ivars_class) do
+          Class.new do
+            def initialize
+              @secret = 'should not be visible'
+            end
+
+            def instance_variables
+              # Return something entirely unexpected
+              [:@fake_var]
+            end
+
+            def raise_error
+              raise 'Error from object overriding #instance_variables'
+            end
+          end
+        end
+
+        it 'handles an object that reports incorrect instance variables' do
+          obj = custom_ivars_class.new
+          expect {
+            obj.raise_error
+          }.to raise_error(RuntimeError, 'Error from object overriding #instance_variables') do |e|
+            # The code should not crash despite instance_variables returning an unexpected array
+            expect(e.binding_infos).not_to be_nil
+            captured = strip_color_codes(e.captured_variables)
+            # We expect the real @secret to not appear, because instance_variables is lying
+            expect(captured).not_to include('@secret')
+            # The code might try to show @fake_var, but presumably it's not actually set
+            expect(captured).to include('@fake_var')
+          end
+        end
+      end
+    end
+
 
     describe 'Edge cases with unusual exceptions and objects' do
       context 'exceptions raised in BasicObject instances' do
