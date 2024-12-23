@@ -1,0 +1,13 @@
+Result from MacOs, Ruby 3.3.6 for benchmark.rb
+
+--------------------------------------------
+
+Cost Exploration
+                                                              user     system      total        real
+Baseline 1k (NO EnhancedErrors, tight error raise loop):  0.000296   0.000040   0.000336 (  0.000334)
+
+Cost per 100 raised exceptions: 0.56 ms
+                                                                             user     system      total        real
+Stress 1k EnhancedErrors  (Tight error raising loop w/ EnhancedErrors):  0.005498   0.000147   0.005645 (  0.005647)
+
+

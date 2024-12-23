@@ -1,8 +1,15 @@
 require 'benchmark'
-require_relative '../lib/enhanced/enhanced' # Adjust the path if necessary
+require_relative '../lib/enhanced_errors' # Adjust the path if necessary
+
+#require 'profile'
+
+# In general, the results of this are--catching exception bindings is pretty cheap.
+# However, catching :call, :return, :b_return, :b_call are 100x more expensive.
+# Makes sense if you think about the relative frequency of things.
+
 
 # Define the number of iterations
-ITERATIONS = 10_000
+ITERATIONS = 1_000
 EXCEPTIONS_PER_BATCH = 100
 
 class Boo < StandardError; end
@@ -12,20 +19,8 @@ def calculate_cost(time_in_seconds)
   (milliseconds / (ITERATIONS / EXCEPTIONS_PER_BATCH)).round(2)
 end
 
-def with_enhanced_errors
-  EnhancedErrors.enhance_exceptions!(debug: false)
-  ITERATIONS.times do
-    begin
-      foo = 'bar'
-      @boo = 'baz'
-      raise 'Test exception with EnhancedErrors'
-    rescue => e
-      e.message
-    end
-  end
-end
 
-def without_enhanced_errors
+def raise_errors
   ITERATIONS.times do
     begin
       foo = 'bar'
@@ -38,8 +33,9 @@ def without_enhanced_errors
 end
 
 def when_capture_only_regexp_matched
+  rxp = /Boo/
   EnhancedErrors.enhance_exceptions!(debug: false) do
-    eligible_for_capture { |exception| !!/Boo/.match(exception.class.to_s) }
+    eligible_for_capture { |exception| !!rxp.match(exception.class.to_s) }
   end
 
   ITERATIONS.times do
@@ -54,8 +50,9 @@ def when_capture_only_regexp_matched
 end
 
 def when_capture_only_regexp_did_not_match
-  EnhancedErrors.enhance_exceptions!(debug: false) do
-    eligible_for_capture { |exception| !!/Baz/.match(exception.class.to_s) }
+  rxp = /Baz/
+  EnhancedErrors.enhance_exceptions!(override_messages: true) do
+    eligible_for_capture { |exception| !!rxp.match(exception.class.to_s) }
   end
 
   ITERATIONS.times do
@@ -71,18 +68,23 @@ end
 
 puts "Cost Exploration\n"
 Benchmark.bm(35) do |x|
-  without_time = x.report('10k Without EnhancedErrors:') { without_enhanced_errors }
-  with_time = x.report('10k With EnhancedErrors:') { with_enhanced_errors }
-
-  puts "\nCost per 100 exceptions (Without EnhancedErrors): #{calculate_cost(without_time.real)} ms"
-  puts "Cost per 100 exceptions (With EnhancedErrors): #{calculate_cost(with_time.real)} ms"
+  without_time = x.report('Baseline 1k (NO EnhancedErrors, tight error raise loop):') { raise_errors }
 end
 
-puts "\nProof that if you only match the classes you care about, the cost is nominal\n"
+puts "\n"
+EnhancedErrors.enhance_exceptions!(debug: false)
+
 Benchmark.bm(35) do |x|
-  matched_time = x.report('10k With capture_only_regexp match:') { when_capture_only_regexp_matched }
-  not_matched_time = x.report('10k Without capture_only_regexp match:') { when_capture_only_regexp_did_not_match }
-
-  puts "\nCost per 100 exceptions (Capture Only Match): #{calculate_cost(matched_time.real)} ms"
-  puts "Cost per 100 exceptions (No Match): #{calculate_cost(not_matched_time.real)} ms"
+  with_time = x.report('Stress 1k EnhancedErrors  (Tight error raising loop w/ EnhancedErrors):') { raise_errors }
+  puts "Cost per 100 raised exceptions: #{calculate_cost(with_time.real)} ms"
 end
+
+
+# puts "\nProof that if you only match the classes you care about, the cost is nominal\n"
+# Benchmark.bm(35) do |x|
+#   matched_time = x.report('1k capture_only_regexp match (same as always-on) :') { when_capture_only_regexp_matched }
+#   not_matched_time = x.report('1k capture_only_regexp not matching (low-cost):') { when_capture_only_regexp_did_not_match }
+#
+#   puts "\nCost per 100 exceptions (Capture Only Match): #{calculate_cost(matched_time.real)} ms"
+#   puts "Cost per 100 exceptions (No Match): #{calculate_cost(not_matched_time.real)} ms"
+# end

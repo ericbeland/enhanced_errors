@@ -71,7 +71,7 @@ def test_exception_with_large_variable(iterations, large_string)
   puts "Memory usage after exceptions: #{memory_usage} KB"
 end
 
-iterations = 10  # Adjust iterations as needed
+iterations = 10000  # Adjust iterations as needed
 
 test_with_tracepoint(iterations, large_string)
 test_without_tracepoint(iterations, large_string)
