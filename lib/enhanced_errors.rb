@@ -45,13 +45,8 @@ class EnhancedErrors
     ].freeze
 
     RAILS_SKIP_LIST = [
-      :@new_record,
-      :@attributes,
       :@association_cache,
-      :@readonly,
-      :@previously_new_record,
       :@_routes,
-      :@routes,
       :@app,
       :@arel_table,
       :@assertion_instance,
