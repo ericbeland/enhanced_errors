@@ -457,19 +457,15 @@ class EnhancedErrors
     def running_in_ci?
       mutex.synchronize do
         return @running_in_ci if defined?(@running_in_ci)
-
         @running_in_ci = CI_ENV_VARS.any? { |_, value| value.to_s.downcase == 'true' }
       end
     end
 
     def apply_skip_list(binding_info)
-      mutex.synchronize do
-        variables = binding_info[:variables]
-        variables[:instances]&.reject! { |var, _| skip_list.include?(var) || (var.to_s.start_with?('@_') && !@debug) }
-        variables[:locals]&.reject! { |var, _| skip_list.include?(var) }
-        if @debug
-          variables[:globals]&.reject! { |var, _| skip_list.include?(var) }
-        end
+      binding_info[:variables][:instances]&.reject! { |var, _| skip_list.include?(var) || (var.to_s[0, 2] == '@_' && !@debug) }
+      binding_info[:variables][:locals]&.reject! { |var, _| skip_list.include?(var) }
+      if @debug
+        binding_info[:variables][:globals]&.reject! { |var, _| skip_list.include?(var) }
       end
       binding_info
     end
