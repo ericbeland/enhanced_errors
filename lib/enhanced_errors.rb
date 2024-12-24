@@ -122,7 +122,7 @@ class EnhancedErrors
       mutex.synchronize { @max_capture_length || DEFAULT_MAX_CAPTURE_LENGTH }
     end
 
-    def max_capture_length=(val)
+    def max_capture_length=(value)
       mutex.synchronize { @max_capture_length = value }
     end
 
@@ -134,7 +134,6 @@ class EnhancedErrors
         @exception_trace&.disable
       end
     end
-
 
     def reset!
       mutex.synchronize do
@@ -847,4 +846,8 @@ class EnhancedErrors
     end
 
   end
+end
+
+module Enhanced
+
 end
