@@ -131,6 +131,7 @@ EnhancedErrors.enhance_exceptions!(override_messages: true)
 ## Features
 
 - **Pure Ruby**: No external dependencies, C extensions, or C API calls.
+- **Improved RSpec and Minitest errors for straight-to-fix--look-ma-no-debugging, look-ma-no-reproducing 
 - **Customizable Output**: Supports multiple output formats (`:json`, `:plaintext`, `:terminal`).
 - **Flexible Hooks**: Redact or modifying captured data via the `on_capture` hook. Update the final string with on_format.
 - **Environment-Based Defaults**: For Rails apps, automatically adjusts settings based on the environment (`development`, `test`, `production`, `ci`).
