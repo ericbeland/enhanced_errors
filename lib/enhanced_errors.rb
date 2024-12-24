@@ -363,7 +363,7 @@ class EnhancedErrors
           globals: {}
         },
         exception: 'NoException',
-        capture_event: 'RSpecContext'
+        capture_event: 'test_context'
       }
 
       default_on_capture(binding_info)
