@@ -895,6 +895,57 @@ RSpec.describe EnhancedErrors do
         end
       end
 
+      context 'when testing EnhancedErrors.singleton_class#exception_is_handleable?' do
+        # Walk ObjectSpace to find the "fatal" class
+        def find_fatal_class
+          ObjectSpace.each_object(Class).find { |klass| klass.to_s == "fatal" }
+        end
+
+        let(:enhanced_errors) { EnhancedErrors }
+
+        it 'returns false for fatal error instances' do
+          fatal_class = find_fatal_class
+          expect(fatal_class).not_to be_nil, "Fatal class not found in ObjectSpace"
+
+          fatal_instance = nil
+          expect { fatal_instance = fatal_class.new("This is a fatal error") }.not_to raise_error
+
+          result = enhanced_errors.send(:exception_is_handleable?, fatal_instance)
+          expect(result).to be false
+        end
+
+        it 'returns true for standard exceptions like RuntimeError' do
+          runtime_error = RuntimeError.new("Standard error")
+          result = enhanced_errors.send(:exception_is_handleable?, runtime_error)
+          expect(result).to be true
+        end
+
+        it 'returns false for SystemExit' do
+          system_exit = SystemExit.new("Exit")
+          result = enhanced_errors.send(:exception_is_handleable?, system_exit)
+          expect(result).to be false
+        end
+
+        it 'returns false for SignalException' do
+          signal_exception = SignalException.new("SIGTERM")
+          result = enhanced_errors.send(:exception_is_handleable?, signal_exception)
+          expect(result).to be false
+        end
+
+        it 'returns false for SystemStackError' do
+          stack_error = SystemStackError.new("Stack overflow")
+          result = enhanced_errors.send(:exception_is_handleable?, stack_error)
+          expect(result).to be false
+        end
+
+        it 'returns false for NoMemoryError' do
+          memory_error = NoMemoryError.new("Out of memory")
+          result = enhanced_errors.send(:exception_is_handleable?, memory_error)
+          expect(result).to be false
+        end
+      end
+
+
       # 5. Object that overrides #instance_variables
       context 'raising exception from an object overriding #instance_variables' do
         let(:custom_ivars_class) do

@@ -217,10 +217,11 @@ class EnhancedErrors
 
         events = @capture_events ? @capture_events.to_a : default_capture_events
         @exception_trace = TracePoint.new(*events) do |tp|
+          return unless exception_is_handleable?(tp.raised_exception)
           handle_tracepoint_event(tp)
         end
 
-        @exception_trace.enable if @enabled
+        @exception_trace&.enable if @enabled
       end
     end
 
@@ -238,7 +239,7 @@ class EnhancedErrors
           next unless tp.method_id.to_s.start_with?('test_') && is_a_minitest?(tp.defined_class)
           @minitest_test_binding = tp.binding
         end
-        @minitest_trace.enable
+        @minitest_trace&.enable
       end
     end
 
@@ -274,6 +275,7 @@ class EnhancedErrors
         @capture_next_binding = false
         @rspec_tracepoint&.disable
         @rspec_tracepoint = TracePoint.new(:raise) do |tp|
+          return unless exception_is_handleable?(tp.raised_exception)
           class_name = tp.raised_exception.class.name
           case class_name
           when 'RSpec::Expectations::ExpectationNotMetError'
@@ -283,7 +285,7 @@ class EnhancedErrors
           end
         end
       end
-      @rspec_tracepoint.enable
+      @rspec_tracepoint&.enable
     end
 
     # Behavior: Grabs the next rspec spec binding that goes by, and stops the more-expensive b_return trace.
@@ -814,6 +816,22 @@ class EnhancedErrors
       ignored = ignored_exception?(exception)
       rspec = exception.class.name.start_with?('RSpec::Matchers')
       !ignored && !rspec
+    end
+
+    # https://github.com/ruby/psych/blob/07dac3490c32ee61c9987dfe668a0e2fd6cb3796/lib/psych/exception.rb#L6
+
+    def exception_is_handleable?(exception)
+      case exception
+      when SystemExit, SignalException, SystemStackError, NoMemoryError
+        # Non-actionable: Ignore these exceptions
+        false
+      when SyntaxError, LoadError, ScriptError, Psych::Exception
+        # Non-actionable: Structural issues, no useful runtime context
+        false
+      else
+        # Ignore internal fatal errors
+        exception.class.to_s != 'fatal'
+      end
     end
 
     # This prevents loading it for say, production, if you don't want to,
