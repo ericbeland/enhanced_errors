@@ -149,9 +149,7 @@ class EnhancedErrors
     end
 
     def skip_list
-      mutex.synchronize do
-        @skip_list ||= DEFAULT_SKIP_LIST
-      end
+      @skip_list ||= DEFAULT_SKIP_LIST.to_set
     end
 
     def override_rspec_message(example, binding_or_bindings)
@@ -182,7 +180,7 @@ class EnhancedErrors
 
     def add_to_skip_list(*vars)
       mutex.synchronize do
-        @skip_list.concat(vars)
+        @skip_list.add(*vars)
       end
     end
 
