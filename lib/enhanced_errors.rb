@@ -329,6 +329,8 @@ class EnhancedErrors
 
       locals = b.local_variables.map { |var| [var, safe_local_variable_get(b, var)] }.to_h
       receiver = b.receiver
+      return unless safe_to_inspect?(receiver)
+
       instance_vars = receiver.instance_variables
       instances = instance_vars.map { |var| [var, safe_instance_variable_get(receiver, var)] }.to_h
 
@@ -469,10 +471,18 @@ class EnhancedErrors
     end
 
     def validate_binding_format(binding_info)
-      unless binding_info.keys.include?(:capture_event) && binding_info[:variables].is_a?(Hash)
-        return nil
+      binding_info.keys.include?(:capture_event) && binding_info[:variables].is_a?(Hash)
+    end
+
+    # Here, we are detecting BasicObject, which is surprisingly annoying.
+    # We also, importantly, need to detect descendants, as they will also present with a
+    # lack of :respond_to? and any other useful method for us.
+    def safe_to_inspect?(obj)
+      begin
+        obj.class
+      rescue NoMethodError
+        return false
       end
-      binding_info
     end
 
     def binding_info_string(binding_info)
@@ -542,32 +552,43 @@ class EnhancedErrors
 
       binding_context = tp.binding
       method_name = tp.method_id
+
+      locals = {}
+
+      binding_context.local_variables.each do |var|
+        locals[var] = safe_local_variable_get(binding_context, var)
+      end
+
       method_and_args = {
         object_name: determine_object_name(tp, method_name),
-        args: extract_arguments(tp, method_name)
+        args: extract_arguments(tp, method_name, locals)
       }
 
-      locals = binding_context.local_variables.map { |var|
-        [var, safe_local_variable_get(binding_context, var)]
-      }.to_h
+      instances = {}
+      receiver = binding_context.receiver
 
-      instance_vars = binding_context.receiver.instance_variables
-      instances = instance_vars.map { |var|
-        [var, safe_instance_variable_get(binding_context.receiver, var)]
-      }.to_h
+      begin
+        if safe_to_inspect?(receiver)
+          receiver.instance_variables.each { |var|
+            instances[var] = safe_instance_variable_get(receiver, var)
+          }
+        end
+      rescue => e
+        puts "#{e.class.name} #{e.backtrace}"
+      end
 
       lets = {}
 
       globals = {}
       mutex.synchronize do
         if @debug
-          globals = (global_variables - @original_global_variables.to_a).map { |var|
-            [var, get_global_variable_value(var)]
-          }.to_h
+          globals = (global_variables - @original_global_variables.to_a).each do |var|
+            globals[var] = get_global_variable_value(var)
+          end
         end
       end
 
-      capture_event = safe_to_s(tp.event)
+      capture_event = tp.event.to_s
       location = "#{safe_to_s(tp.path)}:#{safe_to_s(tp.lineno)}"
       binding_info = {
         source: location,
@@ -581,17 +602,16 @@ class EnhancedErrors
           lets: lets,
           globals: globals
         },
-        exception: safe_to_s(exception.class.name),
+        exception: exception.class.name,
         capture_event: capture_event
       }
 
       binding_info = default_on_capture(binding_info)
-      on_capture_hook_local = mutex.synchronize { @on_capture_hook }
 
-      if on_capture_hook_local
+      if on_capture_hook
         begin
           Thread.current[:on_capture] = true
-          binding_info = on_capture_hook_local.call(binding_info)
+          binding_info = on_capture_hook.call(binding_info)
         rescue
           binding_info = nil
         ensure
@@ -599,18 +619,14 @@ class EnhancedErrors
         end
       end
 
-      if binding_info
-        binding_info = validate_binding_format(binding_info)
-        if binding_info && exception.binding_infos.length >= MAX_BINDING_INFOS
+        return unless binding_info && validate_binding_format(binding_info)
+        if exception.binding_infos.length >= MAX_BINDING_INFOS
           exception.binding_infos.delete_at(MAX_BINDING_INFOS / 2.round)
         end
-        if binding_info
-          exception.binding_infos << binding_info
-          mutex.synchronize do
-            override_exception_message(exception, exception.binding_infos) if @override_messages
-          end
+        exception.binding_infos << binding_info
+        mutex.synchronize do
+          override_exception_message(exception, exception.binding_infos) if @override_messages
         end
-      end
     rescue
       # Avoid raising exceptions here
     ensure
@@ -672,17 +688,15 @@ class EnhancedErrors
       capture_events.is_a?(Array) && capture_events.all? { |ev| [:raise, :rescue].include?(ev) }
     end
 
-    def extract_arguments(tp, method_name)
+    def extract_arguments(tp, method_name, local_vars_hash)
       return '' unless method_name
       begin
-        bind = tp.binding
         unbound_method = tp.defined_class.instance_method(method_name)
         method_obj = unbound_method.bind(tp.self)
         parameters = method_obj.parameters
-        locals = bind.local_variables
 
         parameters.map do |(_, name)|
-          value = locals.include?(name) ? safe_local_variable_get(bind, name) : nil
+          value = local_vars_hash[name]
           "#{name}=#{safe_inspect(value)}"
         rescue => e
           "#{name}=[Error getting argument: #{e.message}]"
