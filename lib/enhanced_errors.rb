@@ -101,6 +101,7 @@ class EnhancedErrors
     @exception_trace = nil
     @override_messages = nil
 
+
     # Thread-safe getters and setters
     def enabled=(val)
       mutex.synchronize { @enabled = val }
@@ -148,7 +149,9 @@ class EnhancedErrors
     end
 
     def skip_list
-      @skip_list ||= DEFAULT_SKIP_LIST.to_set
+      mutex.synchronize do
+        @skip_list ||= DEFAULT_SKIP_LIST.to_set
+      end
     end
 
     def override_rspec_message(example, binding_or_bindings)
@@ -840,6 +843,7 @@ class EnhancedErrors
     def ensure_extensions_are_required
       mutex.synchronize do
         return if @loaded_required_extensions
+        require_relative 'enhanced/colors'
         require_relative 'enhanced/exception'
         @loaded_required_extensions = true
       end
