@@ -536,7 +536,6 @@ class EnhancedErrors
 
     private
 
-
     def handle_tracepoint_event(tp)
       # Check enabled outside the synchronized block for speed, but still safe due to re-check inside.
       return unless enabled
@@ -712,17 +711,20 @@ class EnhancedErrors
 
     def determine_object_name(tp, method_name = '')
       begin
-        self_class = Object.instance_method(:class).bind(tp.self).call
-        singleton_class = Object.instance_method(:singleton_class).bind(tp.self).call
-
-        if self_class && tp.defined_class == singleton_class
-          object_identifier = safe_to_s(tp.self)
-          method_suffix = method_name && !method_name.empty? ? ".#{method_name}" : ""
-          "#{object_identifier}#{method_suffix}"
+        # Check if we're dealing with a singleton method
+        if (
+          class << tp.self
+            self;
+          end) == tp.defined_class
+          # Singleton method call
+          object_str = safe_to_s(tp.self)
+          method_suffix = method_name.to_s.empty? ? '' : ".#{method_name}"
+          "#{object_str}#{method_suffix}"
         else
-          object_class_name = safe_to_s(self_class.name || 'UnknownClass')
-          method_suffix = method_name && !method_name.empty? ? "##{method_name}" : ""
-          "#{object_class_name}#{method_suffix}"
+          # Instance method call
+          klass_name = safe_to_s(tp.self.class.name || 'UnknownClass')
+          method_suffix = method_name.to_s.empty? ? '' : "##{method_name}"
+          "#{klass_name}#{method_suffix}"
         end
       rescue
         '[ErrorGettingName]'
