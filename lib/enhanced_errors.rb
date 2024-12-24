@@ -273,21 +273,28 @@ class EnhancedErrors
         @rspec_example_binding = nil
         @capture_next_binding = false
         @rspec_tracepoint&.disable
-
         @rspec_tracepoint = TracePoint.new(:raise) do |tp|
-            class_name = tp.raised_exception.class.name
-            case class_name
-            when 'RSpec::Expectations::ExpectationNotMetError'
-              start_rspec_binding_trap
-            else
-              handle_tracepoint_event(tp)
-            end
+          class_name = tp.raised_exception.class.name
+          case class_name
+          when 'RSpec::Expectations::ExpectationNotMetError'
+            start_rspec_binding_trap
+          else
+            handle_tracepoint_event(tp)
           end
         end
-        @rspec_tracepoint.enable
+      end
+      @rspec_tracepoint.enable
     end
 
-    # grab the next rspec binding that goes by, and then stop the expensive listening trace
+    # Behavior: Grabs the next rspec spec binding that goes by, and stops the more-expensive b_return trace.
+    # This part of RSpec has been stable, since 2015, so although this is kluge-y, it is stable.
+    # The optimization does a 2-3x on spec speed vs. opening up the Tracepoint. With it,
+    # things are pretty close in speed to plain rspec.
+    # Should the behavior change this can be updated by using a trace to print out items
+    # and their local variables then, find the exception or call that goes by right
+    # before the spec blocks with the variables, and use that to narrow-down the costly part of
+    # the probe to just this point in time. The good news is that
+    # this part is test-time only, and this optimization and kluge only applies to RSpec.
     def start_rspec_binding_trap
       @rspec_binding_trap = TracePoint.new(:b_return) do |tp|
         # kluge-y hack and will be a pain to maintain
@@ -298,12 +305,11 @@ class EnhancedErrors
         next unless @capture_next_binding
         @capture_next_binding = false
         @rspec_example_binding = tp.binding
-        @rspec_binding_trap.disable
+        @rspec_binding_trap&.disable
         @rspec_binding_trap = nil
       end
-      @rspec_binding_trap.enable
+      @rspec_binding_trap&.enable
     end
-
 
     def stop_rspec_binding_capture
       mutex.synchronize do
