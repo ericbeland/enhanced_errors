@@ -4,12 +4,12 @@ require 'set'
 require 'json'
 require 'monitor'
 
-require_relative 'enhanced/colors'
-require_relative 'enhanced/exception'
+module Enhanced; end
 
-IGNORED_EXCEPTIONS = %w[SystemExit NoMemoryError SignalException Interrupt ScriptError LoadError
-NotImplementedError SyntaxError RSpec::Expectations::ExpectationNotMetError
-RSpec::Matchers::BuiltIn::RaiseError SystemStackError Psych::BadAlias]
+# Exceptions we could handle but overlook for other reasons. These class constants are not always loaded
+# and generally are only be available when `required`, so we detect them by strings.
+IGNORED_EXCEPTIONS = %w[RSpec::Expectations::ExpectationNotMetError RSpec::Matchers::BuiltIn::RaiseError
+                        JSON::ParserError Zlib::Error OpenSSL::SSL::SSLError Psych::Exception]
 
 class EnhancedErrors
   extend ::Enhanced
@@ -100,7 +100,6 @@ class EnhancedErrors
     @original_global_variables = nil
     @exception_trace = nil
     @override_messages = nil
-
 
     # Thread-safe getters and setters
     def enabled=(val)
@@ -233,7 +232,7 @@ class EnhancedErrors
 
     def start_minitest_binding_capture
       ensure_extensions_are_required
-      EnhancedExceptionContext.clear_all
+      Enhanced::ExceptionContext.clear_all
       @enabled = true if @enabled.nil?
       return unless @enabled
       mutex.synchronize do
@@ -268,7 +267,7 @@ class EnhancedErrors
 
     def start_rspec_binding_capture
       ensure_extensions_are_required
-      EnhancedExceptionContext.clear_all
+      Enhanced::ExceptionContext.clear_all
       @enabled = true if @enabled.nil?
       return unless @enabled
 
@@ -540,9 +539,13 @@ class EnhancedErrors
       Thread.current[:enhanced_errors_processing] = true
       exception = tp.raised_exception
 
-      capture_me = mutex.synchronize do
-        !exception.frozen? && (@eligible_for_capture || method(:default_eligible_for_capture)).call(exception)
-      end
+      return if exception.frozen?
+
+      capture_me = if @eligible_for_capture
+                     @eligible_for_capture.call(exception)
+                   else
+                     default_eligible_for_capture(exception)
+                   end
 
       unless capture_me
         Thread.current[:enhanced_errors_processing] = false
@@ -618,16 +621,16 @@ class EnhancedErrors
         end
       end
 
-        return unless binding_info && validate_binding_format(binding_info)
-        if exception.binding_infos.length >= MAX_BINDING_INFOS
-          exception.binding_infos.delete_at(MAX_BINDING_INFOS / 2.round)
-        end
-        exception.binding_infos << binding_info
-        mutex.synchronize do
-          override_exception_message(exception, exception.binding_infos) if @override_messages
-        end
-    rescue
-      # Avoid raising exceptions here
+      return unless binding_info && validate_binding_format(binding_info)
+      if exception.binding_infos.length >= MAX_BINDING_INFOS
+        exception.binding_infos.delete_at(MAX_BINDING_INFOS / 2.round)
+      end
+      exception.binding_infos << binding_info
+      mutex.synchronize do
+        override_exception_message(exception, exception.binding_infos) if @override_messages
+      end
+    rescue => e
+      puts "Error: #{e&.class&.name} #{e&.backtrace}"
     ensure
       Thread.current[:enhanced_errors_processing] = false
     end
@@ -812,21 +815,19 @@ class EnhancedErrors
       apply_skip_list(binding_info)
     end
 
+    # By default, we have filtering for safety, but past that, we capture everything by default
+    # at the moment.
     def default_eligible_for_capture(exception)
-      ignored = ignored_exception?(exception)
-      rspec = exception.class.name.start_with?('RSpec::Matchers')
-      !ignored && !rspec
+      true
     end
-
-    # https://github.com/ruby/psych/blob/07dac3490c32ee61c9987dfe668a0e2fd6cb3796/lib/psych/exception.rb#L6
 
     def exception_is_handleable?(exception)
       case exception
       when SystemExit, SignalException, SystemStackError, NoMemoryError
         # Non-actionable: Ignore these exceptions
         false
-      when SyntaxError, LoadError, ScriptError, Psych::Exception
-        # Non-actionable: Structural issues, no useful runtime context
+      when SyntaxError, LoadError, ScriptError
+        # Non-actionable: Structural issues so there's no useful runtime context
         false
       else
         # Ignore internal fatal errors

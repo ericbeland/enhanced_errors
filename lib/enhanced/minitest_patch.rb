@@ -9,7 +9,7 @@ module Minitest
       begin
         binding_infos = EnhancedErrors.stop_minitest_binding_capture
         EnhancedErrors.override_exception_message(result.failures.last, binding_infos) if result.failures.any?
-        EnhancedExceptionContext.clear_all
+        Enhanced::ExceptionContext.clear_all
       rescue => e
         puts "Ignored error during error enhancement: #{e}"
       end

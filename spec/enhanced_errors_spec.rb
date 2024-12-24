@@ -760,7 +760,6 @@ RSpec.describe EnhancedErrors do
         EnhancedErrors.enhance_exceptions! do
           eligible_for_capture { |exception| false }
         end
-
         expect {
           raise 'Test exception'
         }.to raise_error(StandardError) do |e|
