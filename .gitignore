@@ -9,3 +9,6 @@ stackprof.dump
 .ruby-version
 .idea/
 enhanced_errors.iml
+.yardoc/**
+
+
