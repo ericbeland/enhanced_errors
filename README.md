@@ -33,7 +33,6 @@ end
 <img src="./doc/images/enhanced-spec.png" style="height: 369px; width: 712px;"></img>
 
 
-
 The RSpec test-time only approach constrained only to test-time.
 
 ### RSpec Setup
@@ -148,6 +147,7 @@ EnhancedErrors use-cases:
 * Handle CI failures faster by skipping reproduction steps.
 * Address elusive "Heisenbugs" by capturing error context preemptively.
 * Debug cron jobs and daemons with rich, failure-specific logs.
+* LLM-food - Feed debug info with variables into an LLM, making state examine-able for it
 
 ## Installation
 
@@ -452,9 +452,10 @@ I would not enable it in production *yet*.
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at [https://github.com/your_username/enhanced_errors](https://github.com/your_username/enhanced_errors).
+Bug reports and pull requests are welcome on GitHub. 
+
+* Please include tests to demonstrate your contribution working.
 
 ## License
 
 The gem is available as open-source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
-
