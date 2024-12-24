@@ -82,11 +82,11 @@
 <p class="children">
   
     
-      <strong class="modules">Modules:</strong> <span class='object_link'><a href="Enhanced.html" title="Enhanced (module)">Enhanced</a></span>, <span class='object_link'><a href="EnhancedExceptionContext.html" title="EnhancedExceptionContext (module)">EnhancedExceptionContext</a></span>, <span class='object_link'><a href="ExceptionBindingInfos.html" title="ExceptionBindingInfos (module)">ExceptionBindingInfos</a></span>, <span class='object_link'><a href="Minitest.html" title="Minitest (module)">Minitest</a></span>
+      <strong class="modules">Modules:</strong> <span class='object_link'><a href="Enhanced.html" title="Enhanced (module)">Enhanced</a></span>, <span class='object_link'><a href="Minitest.html" title="Minitest (module)">Minitest</a></span>
     
   
     
-      <strong class="classes">Classes:</strong> <span class='object_link'><a href="Context.html" title="Context (class)">Context</a></span>, <span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span>, <span class='object_link'><a href="Exception.html" title="Exception (class)">Exception</a></span>
+      <strong class="classes">Classes:</strong> <span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span>, <span class='object_link'><a href="Exception.html" title="Exception (class)">Exception</a></span>
     
   
 </p>
@@ -100,11 +100,21 @@
     <dl class="constants">
       
         <dt id="IGNORED_EXCEPTIONS-constant" class="">IGNORED_EXCEPTIONS =
-          
+          <div class="docstring">
+  <div class="discussion">
+    
+<p>Exceptions we could handle but overlook for other reasons. These class constants are not always loaded and generally are only be available when ‘required`, so we detect them by strings.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div>
         </dt>
-        <dd><pre class="code"><span class='qwords_beg'>%w[</span><span class='tstring_content'>SystemExit</span><span class='words_sep'> </span><span class='tstring_content'>NoMemoryError</span><span class='words_sep'> </span><span class='tstring_content'>SignalException</span><span class='words_sep'> </span><span class='tstring_content'>Interrupt</span><span class='words_sep'> </span><span class='tstring_content'>ScriptError</span><span class='words_sep'> </span><span class='tstring_content'>LoadError</span><span class='words_sep'>
-</span><span class='tstring_content'>NotImplementedError</span><span class='words_sep'> </span><span class='tstring_content'>SyntaxError</span><span class='words_sep'> </span><span class='tstring_content'>RSpec::Expectations::ExpectationNotMetError</span><span class='words_sep'>
-</span><span class='tstring_content'>RSpec::Matchers::BuiltIn::RaiseError</span><span class='words_sep'> </span><span class='tstring_content'>SystemStackError</span><span class='words_sep'> </span><span class='tstring_content'>Psych::BadAlias</span><span class='tstring_end'>]</span></span></pre></dd>
+        <dd><pre class="code"><span class='qwords_beg'>%w[</span><span class='tstring_content'>RSpec::Expectations::ExpectationNotMetError</span><span class='words_sep'> </span><span class='tstring_content'>RSpec::Matchers::BuiltIn::RaiseError</span><span class='words_sep'>
+</span><span class='tstring_content'>JSON::ParserError</span><span class='words_sep'> </span><span class='tstring_content'>Zlib::Error</span><span class='words_sep'> </span><span class='tstring_content'>OpenSSL::SSL::SSLError</span><span class='words_sep'> </span><span class='tstring_content'>Psych::Exception</span><span class='tstring_end'>]</span></span></pre></dd>
       
     </dl>
   
@@ -120,9 +130,9 @@
 </div>
 
       <div id="footer">
-  Generated on Tue Dec 17 21:43:58 2024 by
+  Generated on Tue Dec 24 15:27:20 2024 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
-  0.9.37 (ruby-3.3.6).
+  0.9.37 (ruby-3.1.3).
 </div>
 
     </div>

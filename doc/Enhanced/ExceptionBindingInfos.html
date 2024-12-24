@@ -4,31 +4,31 @@
     <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>
-  Module: ExceptionBindingInfos
+  Module: Enhanced::ExceptionBindingInfos
   
     &mdash; Documentation by YARD 0.9.37
   
 </title>
 
-  <link rel="stylesheet" href="css/style.css" type="text/css" />
+  <link rel="stylesheet" href="../css/style.css" type="text/css" />
 
-  <link rel="stylesheet" href="css/common.css" type="text/css" />
+  <link rel="stylesheet" href="../css/common.css" type="text/css" />
 
 <script type="text/javascript">
-  pathId = "ExceptionBindingInfos";
-  relpath = '';
+  pathId = "Enhanced::ExceptionBindingInfos";
+  relpath = '../';
 </script>
 
 
-  <script type="text/javascript" charset="utf-8" src="js/jquery.js"></script>
+  <script type="text/javascript" charset="utf-8" src="../js/jquery.js"></script>
 
-  <script type="text/javascript" charset="utf-8" src="js/app.js"></script>
+  <script type="text/javascript" charset="utf-8" src="../js/app.js"></script>
 
 
   </head>
   <body>
     <div class="nav_wrap">
-      <iframe id="nav" src="class_list.html?1"></iframe>
+      <iframe id="nav" src="../class_list.html?1"></iframe>
       <div id="resizer"></div>
     </div>
 
@@ -36,9 +36,9 @@
       <div id="header">
         <div id="menu">
   
-    <a href="_index.html">Index (E)</a> &raquo;
-    
-    
+    <a href="../_index.html">Index (E)</a> &raquo;
+    <span class='title'><span class='object_link'><a href="../Enhanced.html" title="Enhanced (module)">Enhanced</a></span></span>
+     &raquo; 
     <span class="title">ExceptionBindingInfos</span>
   
 </div>
@@ -46,7 +46,7 @@
         <div id="search">
   
     <a class="full_list_link" id="class_list_link"
-        href="class_list.html">
+        href="../class_list.html">
 
         <svg width="24" height="24">
           <rect x="0" y="4" width="24" height="4" rx="1" ry="1"></rect>
@@ -59,7 +59,7 @@
         <div class="clear"></div>
       </div>
 
-      <div id="content"><h1>Module: ExceptionBindingInfos
+      <div id="content"><h1>Module: Enhanced::ExceptionBindingInfos
   
   
   
@@ -76,7 +76,7 @@
   
   <dl>
     <dt>Included in:</dt>
-    <dd><span class='object_link'><a href="Exception.html" title="Exception (class)">Exception</a></span></dd>
+    <dd><span class='object_link'><a href="../Exception.html" title="Exception (class)">Exception</a></span></dd>
   </dl>
   
 
@@ -171,23 +171,23 @@
       <pre class="lines">
 
 
-5
 6
 7
 8
 9
 10
 11
-12</pre>
+12
+13</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced/exception.rb', line 5</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced/exception.rb', line 6</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_binding_infos'>binding_infos</span>
-  <span class='id identifier rubyid_ctx'>ctx</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Enhanced::ExceptionContext.html" title="Enhanced::ExceptionContext (module)">Enhanced::ExceptionContext</a></span></span><span class='period'>.</span><span class='id identifier rubyid_context_for'><span class='object_link'><a href="Enhanced::ExceptionContext.html#context_for-instance_method" title="Enhanced::ExceptionContext#context_for (method)">context_for</a></span></span><span class='lparen'>(</span><span class='kw'>self</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_ctx'>ctx</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="../Enhanced.html" title="Enhanced (module)">Enhanced</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="ExceptionContext.html" title="Enhanced::ExceptionContext (module)">ExceptionContext</a></span></span><span class='period'>.</span><span class='id identifier rubyid_context_for'><span class='object_link'><a href="ExceptionContext.html#context_for-instance_method" title="Enhanced::ExceptionContext#context_for (method)">context_for</a></span></span><span class='lparen'>(</span><span class='kw'>self</span><span class='rparen'>)</span>
   <span class='kw'>unless</span> <span class='id identifier rubyid_ctx'>ctx</span>
-    <span class='id identifier rubyid_ctx'>ctx</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Context.html" title="Context (class)">Context</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Context.html#initialize-instance_method" title="Context#initialize (method)">new</a></span></span>
-    <span class='const'><span class='object_link'><a href="Enhanced::ExceptionContext.html" title="Enhanced::ExceptionContext (module)">Enhanced::ExceptionContext</a></span></span><span class='period'>.</span><span class='id identifier rubyid_store_context'><span class='object_link'><a href="Enhanced::ExceptionContext.html#store_context-instance_method" title="Enhanced::ExceptionContext#store_context (method)">store_context</a></span></span><span class='lparen'>(</span><span class='kw'>self</span><span class='comma'>,</span> <span class='id identifier rubyid_ctx'>ctx</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_ctx'>ctx</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Context.html" title="Enhanced::Context (class)">Context</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Context.html#initialize-instance_method" title="Enhanced::Context#initialize (method)">new</a></span></span>
+    <span class='const'><span class='object_link'><a href="../Enhanced.html" title="Enhanced (module)">Enhanced</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="ExceptionContext.html" title="Enhanced::ExceptionContext (module)">ExceptionContext</a></span></span><span class='period'>.</span><span class='id identifier rubyid_store_context'><span class='object_link'><a href="ExceptionContext.html#store_context-instance_method" title="Enhanced::ExceptionContext#store_context (method)">store_context</a></span></span><span class='lparen'>(</span><span class='kw'>self</span><span class='comma'>,</span> <span class='id identifier rubyid_ctx'>ctx</span><span class='rparen'>)</span>
   <span class='kw'>end</span>
   <span class='id identifier rubyid_ctx'>ctx</span><span class='period'>.</span><span class='id identifier rubyid_binding_infos'>binding_infos</span>
 <span class='kw'>end</span></pre>
@@ -211,7 +211,6 @@
       <pre class="lines">
 
 
-14
 15
 16
 17
@@ -220,15 +219,16 @@
 20
 21
 22
-23</pre>
+23
+24</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/enhanced/exception.rb', line 14</span>
+      <pre class="code"><span class="info file"># File 'lib/enhanced/exception.rb', line 15</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_captured_variables'>captured_variables</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_binding_infos'>binding_infos</span><span class='period'>.</span><span class='id identifier rubyid_any?'>any?</span>
     <span class='id identifier rubyid_bindings_of_interest'>bindings_of_interest</span> <span class='op'>=</span> <span class='id identifier rubyid_select_binding_infos'>select_binding_infos</span>
-    <span class='const'><span class='object_link'><a href="EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_format'><span class='object_link'><a href="EnhancedErrors.html#format-class_method" title="EnhancedErrors.format (method)">format</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_bindings_of_interest'>bindings_of_interest</span><span class='rparen'>)</span>
+    <span class='const'><span class='object_link'><a href="../EnhancedErrors.html" title="EnhancedErrors (class)">EnhancedErrors</a></span></span><span class='period'>.</span><span class='id identifier rubyid_format'><span class='object_link'><a href="../EnhancedErrors.html#format-class_method" title="EnhancedErrors.format (method)">format</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_bindings_of_interest'>bindings_of_interest</span><span class='rparen'>)</span>
   <span class='kw'>else</span>
     <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_end'>&#39;</span></span>
   <span class='kw'>end</span>
@@ -245,9 +245,9 @@
 </div>
 
       <div id="footer">
-  Generated on Tue Dec 17 21:43:58 2024 by
+  Generated on Tue Dec 24 15:27:20 2024 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
-  0.9.37 (ruby-3.3.6).
+  0.9.37 (ruby-3.1.3).
 </div>
 
     </div>
