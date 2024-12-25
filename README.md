@@ -126,6 +126,13 @@ EnhancedErrors.enhance_exceptions!(override_messages: true)
 <img src="./doc/images/enhanced-error.png" style="height: 215px; width: 429px;"></img>
 <br>
 
+EnhancedErrors use-cases:
+* Handle test and CI failures faster by skipping that pesky "reproduction" step.
+* LLM-candy - Feed debug output with variable values into your LLM, making state examine-able
+* Debug deep-stack errors and reduce mean time to resolution (MTTR).
+* Address elusive "Heisenbugs" by capturing full error context preemptively.
+* Debug cron jobs and daemons with rich, failure-specific logs.
+* Catch data-driven bugs in long jobs without re-runs or extensive logging.
 
 
 ## Features
@@ -141,14 +148,6 @@ EnhancedErrors.enhance_exceptions!(override_messages: true)
 - **No dependencies**:  EnhancedErrors does not ___require___ any dependencies--it uses [awesome_print](https://github.com/awesome-print/awesome_print) for nicer output if it is installed and available.
 - **Lightweight**: Minimal performance impact, as tracing is only active during exception raising.
 
-EnhancedErrors use-cases:
-
-* Catch data-driven bugs without needing re-runs or extensive logging.
-* Debug deep-stack errors and reduce mean time to resolution (MTTR).
-* Handle CI failures faster by skipping reproduction steps.
-* Address elusive "Heisenbugs" by capturing error context preemptively.
-* Debug cron jobs and daemons with rich, failure-specific logs.
-* LLM-food - Feed debug info with variables into an LLM, making state examine-able for it
 
 ## Installation
 
@@ -219,9 +218,6 @@ EnhancedErrors adjusts its default settings based on the environment:
 - **Development/Test**:
     - Default Output format: `:terminal`
     - Terminal Color output: Enabled
-- **Production**:
-    - Output format: `:json`
-    - Terminal Color output: Disabled
 - **CI Environment**:
     - Output format: `:plaintext`
     - Color output: Disabled
@@ -430,9 +426,9 @@ To make that work, it has to be able to safely be 'on' ahead of time, and gather
 a way I naturally will retain without requiring extra preparation I obviously didn't know to do.
 
 - EnhancedErrors won't interrupt CI, but it lets me know what happened _without_ reproduction steps
-- EnhancedErrors could, theoretically, also be fine in production (if data security, redaction, 
-PII, access, and encryption concerns were all addressed. 
-Big list, but another option is to selectively enable targeted capture.
+- EnhancedErrors could, theoretically, be fine in production (if data security, redaction, 
+PII, access, and encryption concerns were addressed). Big list, but another option is to selectively enable targeted capture.
+The hooks provide a place to handle things of this sort. 
 - Has decent performance characteristics
 - **Only** becomes active in exception raise/rescue scenarios
 
@@ -446,10 +442,13 @@ Exceptions. It operates in a narrow scope--becoming active only when exceptions 
 
 - **Small Overhead**: Since TracePoint is only activated during exception raising and rescuing, the performance impact is negligible during normal operation. (Benchmark included)
 
-- **TBD**: Memory considerations. This does capture data when an exception happens. EnhancedErrors hides under the bed when it sees **NoMemoryError**.
+- **TBD**: Memory considerations. This does capture data when an exception happens. EnhancedErrors hides under the bed 
+when it sees the scariest exceptions.
 
-- **Goal: Production Safety**: The gem is designed to, eventually, be made safe for production use, giving you valuable insights without compromising performance.
-I would not enable it in production *yet*.
+- **Goal: Production Safety**: The gem is designed to, eventually, be suitable for production use. 
+I might not enable it in production *yet* as it is pretty new. It would require
+a thoughtful approach (perhaps behind a feature flag, or only capturing targeted exceptions
+via the eligible for capture feature).
 
 ## Contributing
 
@@ -460,3 +459,4 @@ Bug reports and pull requests are welcome on GitHub.
 ## License
 
 The gem is available as open-source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
+
