@@ -40,31 +40,41 @@ The RSpec test-time only approach constrained only to test-time.
 Use EnhancedErrors with RSpec for test-specific exception capturing, ideal for CI and local testing without impacting production.
 
 ```ruby
+# usually in spec_helper.rb or rails_helper.rb
+
+require 'enhanced_errors'
+require 'awesome_print' # Optional, for better output
 
 RSpec.configure do |config|
-  config.before(:example) do |_example|
-    EnhancedErrors.start_rspec_binding_capture
-  end
-
-  config.before(:example) do |_example|
-    EnhancedErrors.start_rspec_binding_capture
-  end
-
-  config.after(:example) do |example|
-    EnhancedErrors.override_rspec_message(example, EnhancedErrors.stop_rspec_binding_capture)
-  end
+  
+  # Along with the requires, add this to your RSpec config to enhance your RSpec output
+  # Consider driving the config with an environment variable like this to make it configurable per-user or run
+  # if ENV['enhanced_errors'] == 'true'
+      config.before(:example) do |_example|
+        EnhancedErrors.start_rspec_binding_capture
+      end
+    
+      config.before(:example) do |_example|
+        EnhancedErrors.start_rspec_binding_capture
+      end
+    
+      config.after(:example) do |example|
+        EnhancedErrors.override_rspec_message(example, EnhancedErrors.stop_rspec_binding_capture)
+      end
+  # end
+  
 end
 ```
 
 <br>
 
-
+''''''
 ## MiniTest Setup
 
 ```ruby
 require 'enhanced_errors'
+require 'awesome_print' # Optional, for better output
 require 'enhanced/minitest_patch'
-
 # Once the patch is loaded, it should just work!
 
 ```
@@ -329,10 +339,6 @@ These exceptions are always ignored:
 
 ```ruby
 SystemExit NoMemoryError SignalException Interrupt
-ScriptError LoadError NotImplementedError SyntaxError
-RSpec::Expectations::ExpectationNotMetError
-RSpec::Matchers::BuiltIn::RaiseError
-SystemStackError Psych::BadAlias
 ```
 
 While this is close to "Things that don't descend from StandardError", it's not exactly that.
