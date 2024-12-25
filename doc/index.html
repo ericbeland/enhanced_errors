@@ -169,9 +169,13 @@
 
 <p>&lt;img src=“./doc/images/enhanced-error.png” style=“height: 215px; width: 429px;”&gt;&lt;/img&gt; <br></p>
 
+<p>EnhancedErrors use-cases: * Handle test and CI failures faster by skipping that pesky “reproduction” step. * LLM-candy - Feed debug output with variable values into your LLM, making state examine-able * Debug deep-stack errors and reduce mean time to resolution (MTTR). * Address elusive “Heisenbugs” by capturing full error context preemptively. * Debug cron jobs and daemons with rich, failure-specific logs. * Catch data-driven bugs in long jobs without re-runs or extensive logging.</p>
+
 <h2 id="label-Features">Features</h2>
 <ul><li>
 <p><strong>Pure Ruby</strong>: No external dependencies, C extensions, or C API calls.</p>
+</li><li>
+<p>**Improved RSpec and Minitest errors for straight-to-fix–look-ma-no-debugging, look-ma-no-reproducing</p>
 </li><li>
 <p><strong>Customizable Output</strong>: Supports multiple output formats (<code>:json</code>, <code>:plaintext</code>, <code>:terminal</code>).</p>
 </li><li>
@@ -188,21 +192,6 @@
 <p><strong>No dependencies</strong>: EnhancedErrors does not <strong><em>require</em></strong> any dependencies–it uses <a href="https://github.com/awesome-print/awesome_print">awesome_print</a> for nicer output if it is installed and available.</p>
 </li><li>
 <p><strong>Lightweight</strong>: Minimal performance impact, as tracing is only active during exception raising.</p>
-</li></ul>
-
-<p>EnhancedErrors use-cases:</p>
-<ul><li>
-<p>Catch data-driven bugs without needing re-runs or extensive logging.</p>
-</li><li>
-<p>Debug deep-stack errors and reduce mean time to resolution (MTTR).</p>
-</li><li>
-<p>Handle CI failures faster by skipping reproduction steps.</p>
-</li><li>
-<p>Address elusive “Heisenbugs” by capturing error context preemptively.</p>
-</li><li>
-<p>Debug cron jobs and daemons with rich, failure-specific logs.</p>
-</li><li>
-<p>LLM-food - Feed debug info with variables into an LLM, making state examine-able for it</p>
 </li></ul>
 
 <h2 id="label-Installation">Installation</h2>
@@ -267,13 +256,6 @@
 <p>Default Output format: <code>:terminal</code></p>
 </li><li>
 <p>Terminal Color output: Enabled</p>
-</li></ul>
-</li><li>
-<p><strong>Production</strong>:</p>
-<ul><li>
-<p>Output format: <code>:json</code></p>
-</li><li>
-<p>Terminal Color output: Disabled</p>
 </li></ul>
 </li><li>
 <p><strong>CI Environment</strong>:</p>
@@ -386,7 +368,7 @@
 <ul><li>
 <p><strong>Info Level</strong>: Respects the skip list, excluding predefined sensitive or irrelevant variables. Global variables are ignored.</p>
 </li><li>
-<p><strong>Debug Level</strong>: Ignores the skip lists, capturing all variables including those typically excluded and global variables.  Global variables are only captured in debug mode, and they exclude the default Ruby global variables.</p>
+<p><strong>Debug Level</strong>: Ignores the skip lists, capturing all variables including those typically excluded and global variables. Global variables are only captured in debug mode, and they exclude the default Ruby global variables.</p>
 </li></ul>
 
 <p><strong>Default Behavior</strong>: By default, <code>info</code> level is used, which excludes variables in the skip list to protect sensitive information. In <code>debug</code> mode, the skip lists are ignored to provide more comprehensive data, which is useful during development but should be used cautiously to avoid exposing sensitive data. The info mode is recommended.</p>
@@ -460,7 +442,7 @@
 <ul><li>
 <p>EnhancedErrors won’t interrupt CI, but it lets me know what happened <em>without</em> reproduction steps</p>
 </li><li>
-<p>EnhancedErrors could, theoretically, also be fine in production (if data security, redaction, PII, access, and encryption concerns were all addressed. Big list, but another option is to selectively enable targeted capture.</p>
+<p>EnhancedErrors could, theoretically, be fine in production (if data security, redaction, PII, access, and encryption concerns were addressed). Big list, but another option is to selectively enable targeted capture. The hooks provide a place to handle things of this sort.</p>
 </li><li>
 <p>Has decent performance characteristics</p>
 </li><li>
@@ -473,9 +455,9 @@
 <ul><li>
 <p><strong>Small Overhead</strong>: Since TracePoint is only activated during exception raising and rescuing, the performance impact is negligible during normal operation. (Benchmark included)</p>
 </li><li>
-<p><strong>TBD</strong>: Memory considerations. This does capture data when an exception happens. EnhancedErrors hides under the bed when it sees <strong>NoMemoryError</strong>.</p>
+<p><strong>TBD</strong>: Memory considerations. This does capture data when an exception happens. EnhancedErrors hides under the bed when it sees the scariest exceptions.</p>
 </li><li>
-<p><strong>Goal: Production Safety</strong>: The gem is designed to, eventually, be made safe for production use, giving you valuable insights without compromising performance. I would not enable it in production <em>yet</em>.</p>
+<p><strong>Goal: Production Safety</strong>: The gem is designed to, eventually, be suitable for production use. I might not enable it in production <em>yet</em> as it is pretty new. It would require a thoughtful approach (perhaps behind a feature flag, or only capturing targeted exceptions via the eligible for capture feature).</p>
 </li></ul>
 
 <h2 id="label-Contributing">Contributing</h2>
@@ -491,9 +473,9 @@
 </div></div>
 
       <div id="footer">
-  Generated on Tue Dec 24 15:27:20 2024 by
+  Generated on Wed Dec 25 12:05:05 2024 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
-  0.9.37 (ruby-3.1.3).
+  0.9.37 (ruby-3.4.1).
 </div>
 
     </div>
