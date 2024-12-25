@@ -47,8 +47,8 @@ require 'awesome_print' # Optional, for better output
 
 RSpec.configure do |config|
   
-  # Along with the requires, add this to your RSpec config to enhance your RSpec output
-  # Consider driving the config with an environment variable like this to make it configurable per-user or run
+  # Add this config to RSpec to enhance your output
+  # Consider driving the config with an environment variable to make it configurable per-user or run:
   # if ENV['enhanced_errors'] == 'true'
       config.before(:example) do |_example|
         EnhancedErrors.start_rspec_binding_capture
