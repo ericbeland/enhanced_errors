@@ -554,6 +554,7 @@ class EnhancedErrors
 
       binding_context = tp.binding
       method_name = tp.method_id
+      receiver = binding_context.receiver
 
       locals = {}
 
@@ -567,7 +568,6 @@ class EnhancedErrors
       }
 
       instances = {}
-      receiver = binding_context.receiver
 
       begin
         if safe_to_inspect?(receiver)
