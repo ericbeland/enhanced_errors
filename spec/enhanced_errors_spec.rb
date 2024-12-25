@@ -793,7 +793,8 @@ RSpec.describe EnhancedErrors do
     end
 
     context 'Edge case tests for unusual objects' do
-      # 1. BasicObject that doesn’t define respond_to?
+
+      # BasicObject that doesn’t define respond_to?
       context 'raising exception from a BasicObject descendant' do
         let(:basic_object_class) do
           Class.new(BasicObject) do
@@ -815,7 +816,7 @@ RSpec.describe EnhancedErrors do
         end
       end
 
-      # 2. Object that responds to all method calls via method_missing
+      # Object that responds to all method calls via method_missing
       context 'raising exception from an object that uses method_missing for everything' do
         let(:method_missing_class) do
           Class.new do
@@ -844,7 +845,7 @@ RSpec.describe EnhancedErrors do
         end
       end
 
-      # 3. Raising exception from a singleton class object
+      # Raising exception from a singleton class object
       context 'raising exception from an object’s singleton class' do
         it 'handles exceptions from a singleton class method' do
           obj = Object.new
@@ -863,7 +864,7 @@ RSpec.describe EnhancedErrors do
         end
       end
 
-      # 4. Object that overrides #class and #class.name
+      # Object that overrides #class and #class.name
       context 'raising exception from an object that overrides #class and #class.name' do
         let(:tricky_class) do
           Class.new do
@@ -1037,6 +1038,22 @@ RSpec.describe EnhancedErrors do
             expect(e.binding_infos).not_to be_nil
           end
         end
+      end
+
+      context 'max_capture_length' do
+        let(:default_length) { 2200 }
+
+        it 'sets the max_capture_length correctly' do
+          EnhancedErrors.max_capture_length = 3000
+          expect(EnhancedErrors.max_capture_length).to eq(3000)
+        end
+
+        it 'resets to the default value when set to nil' do
+          EnhancedErrors.max_capture_length = 3000
+          EnhancedErrors.max_capture_length = nil
+          expect(EnhancedErrors.max_capture_length).to eq(default_length)
+        end
+
       end
 
 
