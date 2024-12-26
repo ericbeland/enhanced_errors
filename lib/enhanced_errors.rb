@@ -9,7 +9,7 @@ module Enhanced; end
 # Exceptions we could handle but overlook for other reasons. These class constants are not always loaded
 # and generally are only be available when `required`, so we detect them by strings.
 IGNORED_EXCEPTIONS = %w[RSpec::Expectations::ExpectationNotMetError RSpec::Matchers::BuiltIn::RaiseError
-                        JSON::ParserError Zlib::Error OpenSSL::SSL::SSLError Psych::Exception]
+                        JSON::ParserError Zlib::Error OpenSSL::SSL::SSLError Psych::BadAlias]
 
 class EnhancedErrors
   extend ::Enhanced
@@ -171,6 +171,7 @@ class EnhancedErrors
     end
 
     def override_exception_message(exception, binding_or_bindings)
+      return unless exception_is_handleable?(exception)
       variable_str = EnhancedErrors.format(binding_or_bindings)
       message_str = exception.message
       exception.define_singleton_method(:unaltered_message) { message_str }
@@ -277,13 +278,14 @@ class EnhancedErrors
         @rspec_tracepoint&.disable
         @rspec_tracepoint = TracePoint.new(:raise) do |tp|
           return unless exception_is_handleable?(tp.raised_exception)
-          class_name = tp.raised_exception.class.name
-          case class_name
+          case tp.raised_exception.class.name
           when 'RSpec::Expectations::ExpectationNotMetError'
             start_rspec_binding_trap
           else
             handle_tracepoint_event(tp)
           end
+        rescue => e
+          puts "Error in RSpec biding capture #{e} #{e.backtrace}"
         end
       end
       @rspec_tracepoint&.enable
@@ -635,8 +637,11 @@ class EnhancedErrors
       Thread.current[:enhanced_errors_processing] = false
     end
 
+    # Specifically avoid psych, and system level libraries, or libraries where variable context isn't
+    # likely to be particularly helpful or relevant.
     def ignored_exception?(exception)
-      IGNORED_EXCEPTIONS.include?(exception.class.name)
+      name = exception.class.name
+      IGNORED_EXCEPTIONS.include?(name) || name =~ /^(Gem|Psych|Zlib|OpenSSL|DRb|Prism|Reline|Fiddle)::/
     end
 
     def test_name
@@ -822,6 +827,10 @@ class EnhancedErrors
     end
 
     def exception_is_handleable?(exception)
+      exception && processable_exception?(exception) && !ignored_exception?(exception)
+    end
+
+    def processable_exception?(exception)
       case exception
       when SystemExit, SignalException, SystemStackError, NoMemoryError
         # Non-actionable: Ignore these exceptions
