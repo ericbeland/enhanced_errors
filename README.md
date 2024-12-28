@@ -112,11 +112,14 @@ EnhancedErrors.enhance_exceptions(override_messages: true)
 ```
 
 This captures unanticipated exceptions without modifying all your error handlers. 
-This approach can be used to get detailed logs when problems happen in something like a cron-job.
+This approach can be used to get detailed logs when problems happen in something like a cron-job,
+and the benefit is that you will see variable state you never thought to log, specificaly from around that
+exception you're hunting as long as you are catching and logging the exception's message normally.
+One idea is to put this behind a feature flag, so you can turn on the detail on-the-fly without a deploy.
 
-The tradeoff of this approach is that if you have expectations in your tests/specs around 
-exception messages, those may break. Also, if you are doing something like storing the errors
-in a database, they could be *much* longer and that may pose an issue on field lengths.
+There are some tradeoffs to modifying .message with EnhancedErrors. If you have expectations in your tests/specs
+on exception messages, those may break. Also, if you are doing something like storing the errors
+in a database, they could be *much* longer and that may pose an issue on field lengths. 
 Or if you are writing your logs to Datadog, New Relic, Splunk, etc, log messages for 
 errors will be longer, and you should consider what data/PII you are sharing.
 
@@ -283,10 +286,10 @@ end
 #### Using `eligible_for_capture`
 
 The `eligible_for_capture` hook yields an Exception, and allows you to decide whether you want to capture it or not.
-By default, all exceptions are captured. When the block result is true, the error will be captured.
+By default, bindings are captured for all non-critical exceptions. When the block result is true, the error will be captured.
 Error capture is relatively cheap, but ignoring errors you don't care about makes it almost totally free.
-One use-case for eligible_for_capture is to run a string or regexp off a setting flag, which 
-lets you turn on and off what you capture without redeploying.
+One use-case for eligible_for_capture is to run a string or regexp off a setting/feature flag, which 
+lets you turn on and off what you capture without redeploying. This can let you hunt a specific bug without a re-deploy.
 
 ```ruby 
 EnhancedErrors.eligible_for_capture do |exception|
