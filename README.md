@@ -397,10 +397,9 @@ The captured data includes a `capture_event` field indicating whether the data w
 
 The captured data is available in .captured_variables, to provide context for debugging.
 
-* EnhancedErrors does not persist captured data--it only keep it in memory for the lifetime of the exception.
+* EnhancedErrors does not persist captured data--it only keeps it in memory for the lifetime of the exception.
 * There are benchmarks around Tracepoint in the benchmark folder. Targeted tracepoints
-seem to be very cheap--as in, you can hit them ten thousand+ times a second
-without heavy overhead.
+seem to be pretty cheap--as in, maybe 10 microseconds per exception.
 
 ## Awesome Print
 
